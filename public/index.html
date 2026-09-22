@@ -25,9 +25,14 @@
       <ul class="category-list" id="categoryList"></ul>
     </div>
 
-    <button class="add-category-btn" id="addCategoryBtn">
+    <button class="add-category-btn admin-only" id="addCategoryBtn">
       <i data-lucide="plus"></i>
       <span>카테고리 추가</span>
+    </button>
+
+    <button class="admin-toggle-btn" id="adminToggleBtn">
+      <i data-lucide="lock" id="adminToggleIcon"></i>
+      <span id="adminToggleLabel">관리자로 로그인</span>
     </button>
 
     <p class="status-note" id="statusNote"></p>
@@ -39,7 +44,7 @@
         <i data-lucide="search"></i>
         <input type="text" id="searchInput" placeholder="책 제목, 코멘트 검색...">
       </div>
-      <button class="write-btn" id="writeBtn">
+      <button class="write-btn admin-only" id="writeBtn">
         <i data-lucide="square-pen"></i>
         <span>기록하기</span>
       </button>
@@ -123,11 +128,27 @@
   </div>
 </div>
 
+<!-- 관리자 로그인 모달 -->
+<div class="overlay" id="adminOverlay">
+  <div class="modal cat-modal">
+    <h2>관리자 로그인</h2>
+    <p class="hint">비밀번호를 입력하면 글쓰기/수정/삭제가 가능해져요. 이 브라우저에는 계속 로그인 상태가 유지돼요.</p>
+    <div class="field">
+      <input type="password" id="inAdminPassword" placeholder="비밀번호">
+    </div>
+    <p class="admin-error" id="adminError"></p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="btnAdminCancel">취소</button>
+      <button class="btn btn-solid" id="btnAdminLogin">로그인</button>
+    </div>
+  </div>
+</div>
+
 <!-- 블로그 스타일 상세보기 -->
 <div class="detail-overlay" id="detailOverlay">
   <div class="detail-topbar">
     <button class="icon-btn" id="detailClose"><i data-lucide="arrow-left"></i></button>
-    <div class="detail-actions">
+    <div class="detail-actions admin-only">
       <button class="icon-btn" id="detailEdit"><i data-lucide="pencil"></i></button>
       <button class="icon-btn danger" id="detailDelete"><i data-lucide="trash-2"></i></button>
     </div>

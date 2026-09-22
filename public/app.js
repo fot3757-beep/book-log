@@ -8,6 +8,8 @@
   let currentCoverUrl = null;
   let detailId = null;
   let quill = null;
+  let isAdmin = false;
+  let adminPassword = localStorage.getItem('bookLogAdminPassword') || '';
 
   const $ = (sel) => document.querySelector(sel);
   const statusNote = $('#statusNote');
@@ -26,6 +28,13 @@
   const starPicker = $('#starPicker');
   const inCatName = $('#inCatName');
   const searchInput = $('#searchInput');
+
+  const adminOverlay = $('#adminOverlay');
+  const adminToggleBtn = $('#adminToggleBtn');
+  const adminToggleIcon = $('#adminToggleIcon');
+  const adminToggleLabel = $('#adminToggleLabel');
+  const inAdminPassword = $('#inAdminPassword');
+  const adminError = $('#adminError');
 
   const coverPreview = $('#coverPreview');
   const coverPickBtn = $('#coverPickBtn');
@@ -80,7 +89,10 @@
   async function uploadFile(file) {
     const formData = new FormData();
     formData.append('file', file);
-    const res = await fetch('/api/upload', { method: 'POST', body: formData });
+    const headers = {};
+    if (adminPassword) headers['x-admin-password'] = adminPassword;
+    const res = await fetch('/api/upload', { method: 'POST', body: formData, headers });
+    if (res.status === 401) { setAdminState(false); openAdminModal(); throw new Error('관리자 인증이 필요해요.'); }
     if (!res.ok) throw new Error('upload failed');
     const data = await res.json();
     return data.url;
@@ -156,13 +168,76 @@
 
   // ---------- API ----------
   async function api(path, options) {
-    const res = await fetch(path, options);
+    const opts = options || {};
+    const headers = Object.assign({}, opts.headers);
+    if (adminPassword) headers['x-admin-password'] = adminPassword;
+    const res = await fetch(path, Object.assign({}, opts, { headers }));
+    if (res.status === 401) {
+      setAdminState(false);
+      openAdminModal();
+      throw new Error('관리자 인증이 필요해요.');
+    }
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error || 'request failed');
     }
     return res.json();
   }
+
+  // ---------- Admin login ----------
+  function setAdminState(on) {
+    isAdmin = on;
+    document.body.classList.toggle('is-admin', on);
+    if (adminToggleIcon) adminToggleIcon.setAttribute('data-lucide', on ? 'lock-open' : 'lock');
+    if (adminToggleLabel) adminToggleLabel.textContent = on ? '관리자 모드 (로그아웃)' : '관리자로 로그인';
+    refreshIcons();
+  }
+
+  function openAdminModal() {
+    inAdminPassword.value = '';
+    adminError.textContent = '';
+    adminOverlay.classList.add('show');
+    setTimeout(() => inAdminPassword.focus(), 50);
+  }
+  function closeAdminModal() { adminOverlay.classList.remove('show'); }
+
+  async function verifyAdminPassword(pw, { silent } = {}) {
+    try {
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pw }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.ok) {
+        adminPassword = pw;
+        localStorage.setItem('bookLogAdminPassword', pw);
+        setAdminState(true);
+        closeAdminModal();
+        return true;
+      }
+      if (!silent) adminError.textContent = data.error || '비밀번호가 틀렸어요.';
+      return false;
+    } catch (err) {
+      if (!silent) adminError.textContent = '서버에 연결할 수 없어요.';
+      return false;
+    }
+  }
+
+  adminToggleBtn.addEventListener('click', () => {
+    if (isAdmin) {
+      isAdmin = false;
+      adminPassword = '';
+      localStorage.removeItem('bookLogAdminPassword');
+      setAdminState(false);
+    } else {
+      openAdminModal();
+    }
+  });
+  $('#btnAdminCancel').addEventListener('click', closeAdminModal);
+  $('#btnAdminLogin').addEventListener('click', () => verifyAdminPassword(inAdminPassword.value));
+  inAdminPassword.addEventListener('keydown', (e) => { if (e.key === 'Enter') verifyAdminPassword(inAdminPassword.value); });
+  adminOverlay.addEventListener('click', (e) => { if (e.target === adminOverlay) closeAdminModal(); });
 
   async function loadAll() {
     try {
@@ -470,4 +545,9 @@
   refreshIcons();
   initQuill();
   loadAll();
+  if (adminPassword) {
+    verifyAdminPassword(adminPassword, { silent: true }).then((ok) => {
+      if (!ok) { adminPassword = ''; localStorage.removeItem('bookLogAdminPassword'); }
+    });
+  }
 })();
