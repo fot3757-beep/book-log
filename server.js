@@ -17,8 +17,9 @@ const PORT = process.env.PORT || 3000;
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'data', 'app.db');
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, 'public', 'uploads');
 
-const ACCESS_PASSWORD = process.env.ACCESS_PASSWORD || ''; // 설정하면 비밀번호 보호가 켜집니다.
-const ACCESS_USER = process.env.ACCESS_USER || 'admin';
+// 사이트 자체는 누구나 볼 수 있고, 글쓰기/수정/삭제만 이 비밀번호로 보호됩니다.
+// (예전 ACCESS_PASSWORD 변수를 그대로 쓰고 있다면 계속 인식하도록 둘 다 확인)
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || process.env.ACCESS_PASSWORD || '';
 
 // 폴더 준비
 fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
@@ -57,19 +58,24 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '2mb' }));
 
-// 선택적 비밀번호 보호 (ACCESS_PASSWORD 환경변수를 설정했을 때만 활성화)
-if (ACCESS_PASSWORD) {
-  app.use((req, res, next) => {
-    const auth = req.headers.authorization || '';
-    const expected =
-      'Basic ' + Buffer.from(`${ACCESS_USER}:${ACCESS_PASSWORD}`).toString('base64');
-    if (auth === expected) return next();
-    res.set('WWW-Authenticate', 'Basic realm="My Book Log"');
-    return res.status(401).send('Authentication required.');
-  });
+// 글쓰기/수정/삭제 요청에만 거는 관리자 인증. 조회(GET)는 누구나 가능하고,
+// 프론트엔드가 이 헤더에 비밀번호를 담아 보낼 때만 통과시킵니다.
+function requireAdmin(req, res, next) {
+  if (!ADMIN_PASSWORD) return next(); // 비밀번호를 아예 설정 안 했으면 (개발용) 막지 않음
+  const provided = req.headers['x-admin-password'] || '';
+  if (provided === ADMIN_PASSWORD) return next();
+  return res.status(401).json({ error: '관리자 인증이 필요해요.' });
 }
 
-// 정적 파일 (프론트엔드)
+// 프론트엔드가 비밀번호를 검증만 해볼 수 있는 엔드포인트
+app.post('/api/admin/login', (req, res) => {
+  const password = (req.body && req.body.password) || '';
+  if (!ADMIN_PASSWORD) return res.json({ ok: true }); // 비밀번호 미설정이면 항상 통과
+  if (password === ADMIN_PASSWORD) return res.json({ ok: true });
+  return res.status(401).json({ ok: false, error: '비밀번호가 틀렸어요.' });
+});
+
+// 정적 파일 (프론트엔드) — 누구나 접근 가능
 app.use(express.static(path.join(__dirname, 'public')));
 
 // 업로드된 이미지는 UPLOAD_DIR 위치와 무관하게 항상 /uploads/... 로 접근 가능하게 별도로 서빙
@@ -117,7 +123,7 @@ app.get('/api/categories', (req, res) => {
   res.json(rows.map(r => ({ id: r.id, name: r.name, createdAt: r.created_at })));
 });
 
-app.post('/api/categories', (req, res) => {
+app.post('/api/categories', requireAdmin, (req, res) => {
   const name = (req.body.name || '').trim();
   if (!name) return res.status(400).json({ error: '카테고리 이름이 필요해요.' });
   const id = crypto.randomUUID();
@@ -126,7 +132,7 @@ app.post('/api/categories', (req, res) => {
   res.json({ id, name, createdAt });
 });
 
-app.delete('/api/categories/:id', (req, res) => {
+app.delete('/api/categories/:id', requireAdmin, (req, res) => {
   db.prepare('DELETE FROM categories WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
 });
@@ -153,7 +159,7 @@ app.get('/api/books', (req, res) => {
   res.json(rows.map(rowToBook));
 });
 
-app.post('/api/books', (req, res) => {
+app.post('/api/books', requireAdmin, (req, res) => {
   const b = req.body || {};
   const title = (b.title || '').trim();
   if (!title) return res.status(400).json({ error: '제목이 필요해요.' });
@@ -179,7 +185,7 @@ app.post('/api/books', (req, res) => {
   res.json(rowToBook(row));
 });
 
-app.put('/api/books/:id', (req, res) => {
+app.put('/api/books/:id', requireAdmin, (req, res) => {
   const existing = db.prepare('SELECT * FROM books WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: '기록을 찾을 수 없어요.' });
 
@@ -206,7 +212,7 @@ app.put('/api/books/:id', (req, res) => {
   res.json(rowToBook(row));
 });
 
-app.delete('/api/books/:id', (req, res) => {
+app.delete('/api/books/:id', requireAdmin, (req, res) => {
   db.prepare('DELETE FROM books WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
 });
@@ -214,7 +220,7 @@ app.delete('/api/books/:id', (req, res) => {
 // ---------------------------------------------------------------------------
 // API: 이미지 업로드 (표지 사진 + 에디터 내 이미지 삽입 공용)
 // ---------------------------------------------------------------------------
-app.post('/api/upload', upload.single('file'), (req, res) => {
+app.post('/api/upload', requireAdmin, upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: '파일이 없어요.' });
   res.json({ url: `/uploads/${req.file.filename}` });
 });
