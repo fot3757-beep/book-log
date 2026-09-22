@@ -6,6 +6,7 @@
   let editingId = null;
   let currentRating = 0;
   let currentCoverUrl = null;
+  let currentStatus = 'done';
   let detailId = null;
   let quill = null;
   let isAdmin = false;
@@ -28,6 +29,8 @@
   const starPicker = $('#starPicker');
   const inCatName = $('#inCatName');
   const searchInput = $('#searchInput');
+  const statusPicker = $('#statusPicker');
+  const dateFieldLabel = $('#dateFieldLabel');
 
   const statsOverlay = $('#statsOverlay');
   const statsBtn = $('#statsBtn');
@@ -38,7 +41,17 @@
   const todayViewStatus = $('#todayViewStatus');
   const todayReadCheck = $('#todayReadCheck');
   const todayPages = $('#todayPages');
+  const todaySaveConfirm = $('#todaySaveConfirm');
   let statsChart = null;
+
+  const calendarOverlay = $('#calendarOverlay');
+  const calendarNavBtn = $('#calendarNavBtn');
+  const calMonthLabel = $('#calMonthLabel');
+  const calendarGrid = $('#calendarGrid');
+  const calPrevBtn = $('#calPrevBtn');
+  const calNextBtn = $('#calNextBtn');
+  let calendarMonth = new Date(); // 현재 보고 있는 달 (1일 기준)
+  calendarMonth.setDate(1);
 
   const adminOverlay = $('#adminOverlay');
   const adminToggleBtn = $('#adminToggleBtn');
@@ -157,6 +170,21 @@
   starPicker.addEventListener('click', (e) => {
     const t = e.target.closest('.star-pick');
     if (t) setRating(Number(t.dataset.v));
+  });
+
+  const STATUS_LABELS = { want: '읽고 싶어요', reading: '읽는 중', done: '다 읽었어요' };
+  const STATUS_DATE_LABELS = { want: '추가한 날짜', reading: '읽기 시작한 날짜', done: '다 읽은 날짜' };
+
+  function setStatus(status) {
+    currentStatus = STATUS_LABELS[status] ? status : 'done';
+    statusPicker.querySelectorAll('.status-pick').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.status === currentStatus);
+    });
+    if (dateFieldLabel) dateFieldLabel.textContent = STATUS_DATE_LABELS[currentStatus];
+  }
+  statusPicker.addEventListener('click', (e) => {
+    const t = e.target.closest('.status-pick');
+    if (t) setStatus(t.dataset.status);
   });
 
   function escapeHtml(s) {
@@ -354,6 +382,7 @@
             <div class="book-meta">
               <div class="rating">${starsInlineHtml(b.rating)}</div>
               <div class="card-bottom-row">
+                ${b.status && b.status !== 'done' ? `<span class="status-badge ${b.status}">${escapeHtml(STATUS_LABELS[b.status] || '')}</span>` : ''}
                 ${b.category ? `<span class="cat-tag">${escapeHtml(b.category)}</span>` : ''}
                 ${b.date ? `<span class="date-badge"><i data-lucide="calendar"></i><span>${fmtDate(b.date)}</span></span>` : ''}
               </div>
@@ -404,6 +433,7 @@
       ${b.author ? `<div class="detail-author">${escapeHtml(b.author)}</div>` : ''}
       <div class="detail-meta-row">
         <div class="detail-stars">${starsHtml}</div>
+        ${b.status && b.status !== 'done' ? `<span class="status-badge ${b.status}">${escapeHtml(STATUS_LABELS[b.status] || '')}</span>` : ''}
         ${b.category ? `<span class="cat-tag">${escapeHtml(b.category)}</span>` : ''}
         ${b.date ? `<span class="date-badge"><i data-lucide="calendar"></i><span>${fmtDate(b.date)}</span></span>` : ''}
       </div>
@@ -440,6 +470,7 @@
     inDate.value = todayStr();
     quill.setContents([]);
     setRating(0);
+    setStatus('done');
     setCoverPreview(null);
     renderCategoryOptions();
     if (currentFilter !== 'all') inCategory.value = currentFilter;
@@ -457,6 +488,7 @@
     inDate.value = b.date || todayStr();
     quill.root.innerHTML = b.note || '';
     setRating(b.rating || 0);
+    setStatus(b.status || 'done');
     setCoverPreview(b.coverUrl || null);
     renderCategoryOptions();
     if (b.category) inCategory.value = b.category;
@@ -477,6 +509,7 @@
       date: inDate.value || todayStr(),
       note: noteHtml,
       coverUrl: currentCoverUrl || '',
+      status: currentStatus,
     };
     try {
       let saved;
@@ -647,10 +680,100 @@
       todayViewStatus.textContent = saved.read
         ? `오늘 읽었어요${saved.pages ? ` · ${saved.pages}쪽` : ''}`
         : '오늘은 아직 안 읽었어요';
+      todaySaveConfirm.classList.add('show');
+      clearTimeout(todaySaveConfirm._timer);
+      todaySaveConfirm._timer = setTimeout(() => todaySaveConfirm.classList.remove('show'), 2200);
     } catch (err) {
       console.error(err);
+      statusNote.textContent = '저장에 실패했어요. 관리자 로그인 상태를 확인해주세요.';
     }
   });
+
+  // ---------- Calendar ----------
+  function pad2(n) { return String(n).padStart(2, '0'); }
+
+  function booksByDate() {
+    const map = {};
+    books.forEach(b => {
+      if (!b.date || b.status === 'want') return; // '읽고 싶어요'는 아직 읽은 게 아니라 달력에 표시 안 함
+      if (!map[b.date]) map[b.date] = [];
+      map[b.date].push(b);
+    });
+    return map;
+  }
+
+  function renderCalendar() {
+    const year = calendarMonth.getFullYear();
+    const month = calendarMonth.getMonth(); // 0-based
+    calMonthLabel.textContent = `${year}년 ${month + 1}월`;
+
+    const firstDayOfWeek = new Date(year, month, 1).getDay(); // 0=일
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const map = booksByDate();
+    const today = todayStr();
+
+    let html = '';
+    for (let i = 0; i < firstDayOfWeek; i++) {
+      html += '<div class="cal-cell empty"></div>';
+    }
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${year}-${pad2(month + 1)}-${pad2(day)}`;
+      const dayBooks = map[dateStr] || [];
+      const isToday = dateStr === today;
+      const hasBook = dayBooks.length > 0;
+      const first = dayBooks[0];
+
+      let coverHtml = '';
+      if (hasBook) {
+        coverHtml = first.coverUrl
+          ? `<img class="cal-cover-img" src="${first.coverUrl}" alt="">`
+          : `<div class="cal-cover-fallback"><i data-lucide="book"></i></div>`;
+      }
+      const badge = dayBooks.length > 1 ? `<span class="cal-badge">+${dayBooks.length - 1}</span>` : '';
+
+      html += `
+        <div class="cal-cell ${hasBook ? 'has-book' : ''} ${isToday ? 'is-today' : ''}" data-date="${dateStr}" data-first-id="${hasBook ? first.id : ''}">
+          <span class="cal-day-num">${day}</span>
+          ${coverHtml}
+          ${badge}
+        </div>`;
+    }
+    calendarGrid.innerHTML = html;
+
+    calendarGrid.querySelectorAll('.cal-cell.has-book').forEach(cell => {
+      cell.addEventListener('click', () => {
+        const id = cell.dataset.firstId;
+        calendarOverlay.classList.remove('show');
+        openDetail(id);
+      });
+    });
+    calendarGrid.querySelectorAll('.cal-cell:not(.has-book):not(.empty)').forEach(cell => {
+      cell.addEventListener('click', () => {
+        if (!isAdmin) return;
+        calendarOverlay.classList.remove('show');
+        openAddModal();
+        inDate.value = cell.dataset.date;
+      });
+    });
+    refreshIcons();
+  }
+
+  calendarNavBtn.addEventListener('click', () => {
+    calendarMonth = new Date();
+    calendarMonth.setDate(1);
+    renderCalendar();
+    calendarOverlay.classList.add('show');
+  });
+  calPrevBtn.addEventListener('click', () => {
+    calendarMonth.setMonth(calendarMonth.getMonth() - 1);
+    renderCalendar();
+  });
+  calNextBtn.addEventListener('click', () => {
+    calendarMonth.setMonth(calendarMonth.getMonth() + 1);
+    renderCalendar();
+  });
+  $('#btnCalendarClose').addEventListener('click', () => calendarOverlay.classList.remove('show'));
+  calendarOverlay.addEventListener('click', (e) => { if (e.target === calendarOverlay) calendarOverlay.classList.remove('show'); });
 
   refreshIcons();
   initQuill();

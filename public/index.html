@@ -21,6 +21,11 @@
       <span>My Book Log</span>
     </div>
 
+    <button class="side-nav-item" id="calendarNavBtn">
+      <i data-lucide="calendar-days"></i>
+      <span>캘린더</span>
+    </button>
+
     <div class="category-section">
       <h3>Categories</h3>
       <ul class="category-list" id="categoryList"></ul>
@@ -92,13 +97,22 @@
       </div>
     </div>
 
+    <div class="field">
+      <label>읽기 상태</label>
+      <div class="status-picker" id="statusPicker">
+        <button type="button" class="status-pick" data-status="want">읽고 싶어요</button>
+        <button type="button" class="status-pick" data-status="reading">읽는 중</button>
+        <button type="button" class="status-pick" data-status="done">다 읽었어요</button>
+      </div>
+    </div>
+
     <div class="field-row">
       <div class="field">
         <label>카테고리</label>
         <select id="inCategory"></select>
       </div>
       <div class="field">
-        <label>날짜</label>
+        <label id="dateFieldLabel">날짜</label>
         <input type="date" id="inDate">
       </div>
     </div>
@@ -163,6 +177,25 @@
   <article class="detail-article" id="detailArticle"></article>
 </div>
 
+<!-- 캘린더 -->
+<div class="overlay" id="calendarOverlay">
+  <div class="modal modal-wide">
+    <div class="calendar-header">
+      <button class="icon-btn" id="calPrevBtn"><i data-lucide="chevron-left"></i></button>
+      <h2 id="calMonthLabel">2026년 9월</h2>
+      <button class="icon-btn" id="calNextBtn"><i data-lucide="chevron-right"></i></button>
+    </div>
+    <div class="calendar-weekdays">
+      <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
+    </div>
+    <div class="calendar-grid" id="calendarGrid"></div>
+    <p class="calendar-hint">표지가 있는 날짜를 누르면 그날 기록으로 이동해요.</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="btnCalendarClose">닫기</button>
+    </div>
+  </div>
+</div>
+
 <!-- 통계 패널 -->
 <div class="overlay" id="statsOverlay">
   <div class="modal modal-wide">
@@ -199,7 +232,10 @@
           <label for="todayPages">오늘 읽은 쪽수</label>
           <input type="number" id="todayPages" min="0" placeholder="0">
         </div>
-        <button class="btn btn-solid" id="btnTodaySave">저장</button>
+        <div class="today-save-row">
+          <button class="btn btn-solid" id="btnTodaySave">저장</button>
+          <span class="save-confirm" id="todaySaveConfirm">저장됐어요 ✓</span>
+        </div>
       </div>
     </div>
 
