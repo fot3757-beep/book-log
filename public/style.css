@@ -164,6 +164,37 @@ aside {
 .category-item:hover .cat-del { display: flex; }
 .category-item:hover .count { display: none; }
 
+.cat-node { display: flex; flex-direction: column; }
+.cat-row {
+  display: flex; align-items: center; gap: 4px; padding: 10px 8px 10px 4px;
+  border-radius: var(--radius-md); cursor: pointer; font-size: 0.92rem; color: var(--ink-soft);
+  transition: background-color .15s, color .15s;
+}
+.cat-row:hover { background-color: var(--chip-bg); }
+.cat-row.active { background-color: var(--chip-bg); color: var(--ink); font-weight: 600; }
+.cat-row .cat-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cat-toggle {
+  flex: none; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center;
+  background: none; border: none; color: var(--ink-faint); cursor: pointer; padding: 0;
+  transition: transform .15s;
+}
+.cat-toggle.open { transform: rotate(90deg); }
+.cat-toggle-spacer { width: 18px; flex: none; }
+.cat-row .count {
+  flex: none; font-size: 0.75rem; background-color: var(--tag-bg); padding: 2px 8px;
+  border-radius: 20px; color: var(--ink-faint);
+}
+.cat-row .cat-add-sub, .cat-row .cat-del {
+  flex: none; display: none; width: 20px; height: 20px; align-items: center; justify-content: center;
+  border-radius: 50%; color: var(--ink-faintest); background: none; border: none; cursor: pointer;
+}
+.cat-row .cat-add-sub svg, .cat-row .cat-del svg { width: 12px; height: 12px; }
+.cat-row:hover .cat-add-sub,
+.cat-row:hover .cat-del { display: flex; }
+.cat-row:hover .count { display: none; }
+.cat-children { display: flex; flex-direction: column; padding-left: 18px; }
+.cat-children.collapsed { display: none; }
+
 .add-category-btn {
   display: flex; align-items: center; gap: 8px; background: none;
   border: 1px dashed var(--ink-faintest); padding: 10px; border-radius: var(--radius-md);
@@ -176,7 +207,8 @@ aside {
 /* 로그인 전에는 쓰기/수정/삭제 관련 요소를 전부 숨김 */
 body:not(.is-admin) .admin-only { display: none !important; }
 body:not(.is-admin) .book-del,
-body:not(.is-admin) .cat-del { display: none !important; }
+body:not(.is-admin) .cat-del,
+body:not(.is-admin) .cat-add-sub { display: none !important; }
 
 .admin-toggle-btn {
   display: flex; align-items: center; gap: 8px; background: none;
@@ -206,6 +238,12 @@ header {
 .search-bar svg { color: var(--ink-faintest); flex: none; width: 18px; height: 18px; }
 .search-bar input { border: none; background: none; outline: none; font-size: 0.9rem; width: 100%; color: var(--ink); font-family: inherit; }
 .search-bar input::placeholder { color: var(--ink-faintest); }
+
+.sort-select {
+  border: 1px solid var(--border); background: var(--chip-bg); color: var(--ink-soft);
+  border-radius: var(--radius-md); padding: 9px 12px; font-size: 0.85rem; font-family: inherit;
+  cursor: pointer; outline: none; flex: none;
+}
 
 .write-btn {
   display: flex; align-items: center; gap: 8px; background-color: var(--accent); color: var(--accent-contrast);
@@ -295,6 +333,23 @@ header {
 .read-dates-add-row .cover-btn { flex: none; }
 
 .book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+
+.type-filter-bar { display: flex; gap: 8px; flex-wrap: wrap; }
+.type-chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--ink-soft);
+  font-size: 0.85rem; font-family: inherit; cursor: pointer;
+}
+.type-chip svg { width: 14px; height: 14px; }
+.type-chip.active { background: var(--accent); color: var(--accent-contrast); border-color: var(--accent); }
+
+.type-badge {
+  display: inline-flex; align-items: center; gap: 4px; font-size: 0.72rem; padding: 2px 9px;
+  border-radius: 20px; background: var(--tag-bg); color: var(--ink-faint); font-weight: 600;
+}
+.type-badge svg { width: 11px; height: 11px; }
+
+.stats-type-tabs { justify-content: center; margin-bottom: 18px; }
 
 .book-card {
   background-color: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);

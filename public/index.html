@@ -50,6 +50,12 @@
         <i data-lucide="search"></i>
         <input type="text" id="searchInput" placeholder="책 제목, 코멘트 검색...">
       </div>
+      <select class="sort-select" id="sortSelect">
+        <option value="date_desc">최신순</option>
+        <option value="date_asc">오래된순</option>
+        <option value="rating_desc">별점 높은순</option>
+        <option value="rating_asc">별점 낮은순</option>
+      </select>
       <div class="header-actions">
         <button class="write-btn stats-btn" id="statsBtn">
           <i data-lucide="bar-chart-3"></i>
@@ -61,6 +67,13 @@
         </button>
       </div>
     </header>
+
+    <div class="type-filter-bar" id="typeFilterBar">
+      <button type="button" class="type-chip active" data-type="all"><span>전체</span></button>
+      <button type="button" class="type-chip" data-type="book"><i data-lucide="book"></i><span>책</span></button>
+      <button type="button" class="type-chip" data-type="movie"><i data-lucide="film"></i><span>영화</span></button>
+      <button type="button" class="type-chip" data-type="drama"><i data-lucide="tv"></i><span>드라마</span></button>
+    </div>
 
     <div id="bookGridWrap"></div>
   </main>
@@ -86,13 +99,22 @@
       </div>
     </div>
 
+    <div class="field">
+      <label>종류</label>
+      <div class="status-picker" id="typePicker">
+        <button type="button" class="status-pick" data-type="book"><i data-lucide="book"></i><span>책</span></button>
+        <button type="button" class="status-pick" data-type="movie"><i data-lucide="film"></i><span>영화</span></button>
+        <button type="button" class="status-pick" data-type="drama"><i data-lucide="tv"></i><span>드라마</span></button>
+      </div>
+    </div>
+
     <div class="field-row">
       <div class="field">
-        <label>책 제목</label>
+        <label id="titleFieldLabel">책 제목</label>
         <input type="text" id="inTitle" placeholder="예: 불편한 편의점">
       </div>
       <div class="field">
-        <label>저자 (선택)</label>
+        <label id="authorFieldLabel">저자 (선택)</label>
         <input type="text" id="inAuthor" placeholder="예: 김호연">
       </div>
     </div>
@@ -133,14 +155,14 @@
     </div>
 
     <div class="field">
-      <label>읽은 날짜 (하루에 다 못 읽었다면 여러 날짜를 나눠서 추가하세요)</label>
+      <label id="readDatesFieldLabel">읽은 날짜 (하루에 다 못 읽었다면 여러 날짜를 나눠서 추가하세요)</label>
       <div class="read-dates-list" id="readDatesList"></div>
       <div class="read-dates-add-row">
         <input type="date" id="inReadDateNew">
         <input type="number" id="inReadPagesNew" placeholder="쪽수(선택)" min="0">
         <button type="button" class="cover-btn" id="btnAddReadDate"><i data-lucide="plus"></i><span>추가</span></button>
       </div>
-      <p class="cover-hint">여기에 추가한 날짜들이 캘린더에 이 책 표지로 표시돼요. 하나도 안 넣으면 위의 '날짜' 하나만 캘린더에 반영돼요.</p>
+      <p class="cover-hint" id="readDatesHint">여기에 추가한 날짜들이 캘린더에 이 책 표지로 표시돼요. 하나도 안 넣으면 위의 '날짜' 하나만 캘린더에 반영돼요.</p>
     </div>
 
     <div class="modal-actions">
@@ -153,7 +175,8 @@
 <!-- 카테고리 추가 모달 -->
 <div class="overlay" id="catOverlay">
   <div class="modal cat-modal">
-    <h2>새 카테고리</h2>
+    <h2 id="catModalTitle">새 카테고리</h2>
+    <p class="hint" id="catParentHint" style="display:none;"></p>
     <p class="hint">예: 소설 / 추리, 에세이 / 시, 자기계발...</p>
     <div class="field">
       <input type="text" id="inCatName" placeholder="카테고리 이름">
@@ -217,10 +240,17 @@
   <div class="modal modal-wide">
     <h2>독서 통계</h2>
 
+    <div class="status-picker stats-type-tabs" id="statsTypeTabs">
+      <button type="button" class="status-pick active" data-type="all">전체</button>
+      <button type="button" class="status-pick" data-type="book"><i data-lucide="book"></i><span>책</span></button>
+      <button type="button" class="status-pick" data-type="movie"><i data-lucide="film"></i><span>영화</span></button>
+      <button type="button" class="status-pick" data-type="drama"><i data-lucide="tv"></i><span>드라마</span></button>
+    </div>
+
     <div class="stats-summary">
       <div class="stats-total">
         <span class="stats-total-num" id="statsTotalNum">0</span>
-        <span class="stats-total-label">권 완독</span>
+        <span class="stats-total-label" id="statsTotalLabel">권 완독</span>
       </div>
     </div>
 

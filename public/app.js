@@ -8,6 +8,8 @@
   let currentCoverUrl = null;
   let currentStatus = 'done';
   let currentReadDates = []; // [{date, pages}]
+  let currentType = 'book';
+  let currentTypeFilter = 'all';
   let detailId = null;
   let quill = null;
   let isAdmin = false;
@@ -20,6 +22,10 @@
 
   const bookOverlay = $('#bookOverlay');
   const catOverlay = $('#catOverlay');
+  const catModalTitle = $('#catModalTitle');
+  const catParentHint = $('#catParentHint');
+  let pendingParentId = null;
+  let expandedCatIds = new Set();
   const detailOverlay = $('#detailOverlay');
   const detailArticle = $('#detailArticle');
   const modalTitle = $('#modalTitle');
@@ -31,6 +37,17 @@
   const starPicker = $('#starPicker');
   const inCatName = $('#inCatName');
   const searchInput = $('#searchInput');
+  const sortSelect = $('#sortSelect');
+  let currentSort = 'date_desc';
+  const typeFilterBar = $('#typeFilterBar');
+  const typePicker = $('#typePicker');
+  const titleFieldLabel = $('#titleFieldLabel');
+  const authorFieldLabel = $('#authorFieldLabel');
+  const readDatesFieldLabel = $('#readDatesFieldLabel');
+  const readDatesHint = $('#readDatesHint');
+  const statsTypeTabs = $('#statsTypeTabs');
+  const statsTotalLabel = $('#statsTotalLabel');
+  let currentStatsType = 'all';
   const statusPicker = $('#statusPicker');
   const dateFieldLabel = $('#dateFieldLabel');
   const readDatesList = $('#readDatesList');
@@ -181,12 +198,76 @@
   const STATUS_LABELS = { want: '읽고 싶어요', reading: '읽는 중', done: '다 읽었어요' };
   const STATUS_DATE_LABELS = { want: '추가한 날짜', reading: '읽기 시작한 날짜', done: '다 읽은 날짜' };
 
+  const TYPE_META = {
+    book: {
+      icon: 'book', label: '책',
+      titleLabel: '책 제목', authorLabel: '저자 (선택)',
+      titlePlaceholder: '예: 불편한 편의점', authorPlaceholder: '예: 김호연',
+      statusLabels: { want: '읽고 싶어요', reading: '읽는 중', done: '다 읽었어요' },
+      dateLabels: { want: '추가한 날짜', reading: '읽기 시작한 날짜', done: '다 읽은 날짜' },
+      readDatesLabel: '읽은 날짜 (하루에 다 못 읽었다면 여러 날짜를 나눠서 추가하세요)',
+      readDatesHint: "여기에 추가한 날짜들이 캘린더에 이 책 표지로 표시돼요. 하나도 안 넣으면 위의 '날짜' 하나만 캘린더에 반영돼요.",
+      pagesPlaceholder: '쪽수(선택)',
+      statsLabel: '권 완독',
+    },
+    movie: {
+      icon: 'film', label: '영화',
+      titleLabel: '영화 제목', authorLabel: '감독/출연 (선택)',
+      titlePlaceholder: '예: 인터스텔라', authorPlaceholder: '예: 크리스토퍼 놀란',
+      statusLabels: { want: '보고 싶어요', reading: '보는 중', done: '다 봤어요' },
+      dateLabels: { want: '추가한 날짜', reading: '보기 시작한 날짜', done: '다 본 날짜' },
+      readDatesLabel: '본 날짜 (나눠서 봤다면 여러 날짜를 추가하세요)',
+      readDatesHint: "여기에 추가한 날짜들이 캘린더에 이 영화 포스터로 표시돼요. 하나도 안 넣으면 위의 '날짜' 하나만 캘린더에 반영돼요.",
+      pagesPlaceholder: '메모(선택)',
+      statsLabel: '편 감상',
+    },
+    drama: {
+      icon: 'tv', label: '드라마',
+      titleLabel: '드라마 제목', authorLabel: '감독/출연 (선택)',
+      titlePlaceholder: '예: 미스터 션샤인', authorPlaceholder: '예: 이응복',
+      statusLabels: { want: '보고 싶어요', reading: '보는 중', done: '다 봤어요' },
+      dateLabels: { want: '추가한 날짜', reading: '보기 시작한 날짜', done: '다 본 날짜' },
+      readDatesLabel: '본 날짜 (하루에 몰아보지 않았다면 회차별로 날짜를 추가하세요)',
+      readDatesHint: "여기에 추가한 날짜들이 캘린더에 이 드라마 포스터로 표시돼요. 하나도 안 넣으면 위의 '날짜' 하나만 캘린더에 반영돼요.",
+      pagesPlaceholder: '몇 회(선택)',
+      statsLabel: '편 완주',
+    },
+  };
+
+  function setType(type) {
+    currentType = TYPE_META[type] ? type : 'book';
+    const meta = TYPE_META[currentType];
+    typePicker.querySelectorAll('.status-pick').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.type === currentType);
+    });
+    titleFieldLabel.textContent = meta.titleLabel;
+    inTitle.placeholder = meta.titlePlaceholder;
+    authorFieldLabel.textContent = meta.authorLabel;
+    inAuthor.placeholder = meta.authorPlaceholder;
+    readDatesFieldLabel.textContent = meta.readDatesLabel;
+    readDatesHint.textContent = meta.readDatesHint;
+    inReadPagesNew.placeholder = meta.pagesPlaceholder;
+    statusPicker.querySelectorAll('.status-pick').forEach(btn => {
+      const key = btn.dataset.status;
+      const span = btn.querySelector('span');
+      if (span) span.textContent = meta.statusLabels[key];
+    });
+    if (dateFieldLabel) dateFieldLabel.textContent = meta.dateLabels[currentStatus] || meta.dateLabels.done;
+  }
+  typePicker.addEventListener('click', (e) => {
+    const t = e.target.closest('.status-pick');
+    if (t) setType(t.dataset.type);
+  });
+
   function setStatus(status) {
     currentStatus = STATUS_LABELS[status] ? status : 'done';
     statusPicker.querySelectorAll('.status-pick').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.status === currentStatus);
     });
-    if (dateFieldLabel) dateFieldLabel.textContent = STATUS_DATE_LABELS[currentStatus];
+    if (dateFieldLabel) {
+      const meta = TYPE_META[currentType] || TYPE_META.book;
+      dateFieldLabel.textContent = meta.dateLabels[currentStatus] || meta.dateLabels.done;
+    }
   }
   statusPicker.addEventListener('click', (e) => {
     const t = e.target.closest('.status-pick');
@@ -202,7 +283,7 @@
     const sorted = [...currentReadDates].sort((a, b) => a.date.localeCompare(b.date));
     readDatesList.innerHTML = sorted.map(rd => `
       <span class="read-date-chip" data-date="${rd.date}">
-        ${fmtDate(rd.date)}${rd.pages ? `<span class="rd-pages">· ${rd.pages}쪽</span>` : ''}
+        ${fmtDate(rd.date)}${rd.pages ? `<span class="rd-pages">· ${rd.pages}${currentType === 'book' ? '쪽' : currentType === 'drama' ? '회' : ''}</span>` : ''}
         <button type="button" class="rd-del" data-date="${rd.date}"><i data-lucide="x"></i></button>
       </span>
     `).join('');
@@ -336,6 +417,37 @@
   }
 
   // ---------- Rendering ----------
+  // ---------- Category tree helpers ----------
+  function buildCategoryChildrenMap() {
+    const byParent = {};
+    categories.forEach(c => {
+      const key = c.parentId || 'root';
+      if (!byParent[key]) byParent[key] = [];
+      byParent[key].push(c);
+    });
+    return byParent;
+  }
+
+  function getDescendantAndSelfNames(categoryName) {
+    const cat = categories.find(c => c.name === categoryName);
+    if (!cat) return [categoryName];
+    const names = [cat.name];
+    const stack = [cat.id];
+    while (stack.length) {
+      const pid = stack.pop();
+      categories.filter(c => c.parentId === pid).forEach(child => {
+        names.push(child.name);
+        stack.push(child.id);
+      });
+    }
+    return names;
+  }
+
+  function countBooksForCategory(categoryName) {
+    const names = new Set(getDescendantAndSelfNames(categoryName));
+    return books.filter(b => names.has(b.category)).length;
+  }
+
   function renderCategoryOptions() {
     inCategory.innerHTML = '';
     if (categories.length === 0) {
@@ -345,43 +457,99 @@
       inCategory.appendChild(opt);
       return;
     }
-    categories.forEach(c => {
-      const opt = document.createElement('option');
-      opt.value = c.name;
-      opt.textContent = c.name;
-      inCategory.appendChild(opt);
-    });
+    const byParent = buildCategoryChildrenMap();
+    function walk(parentKey, depth) {
+      (byParent[parentKey] || []).forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.name;
+        opt.textContent = `${'　'.repeat(depth)}${depth > 0 ? '└ ' : ''}${c.name}`;
+        inCategory.appendChild(opt);
+        walk(c.id, depth + 1);
+      });
+    }
+    walk('root', 0);
   }
 
   function renderCategoryList() {
     categoryList.innerHTML = '';
-    const allItem = document.createElement('li');
-    allItem.className = 'category-item' + (currentFilter === 'all' ? ' active' : '');
-    allItem.innerHTML = `<span class="cat-name">전체보기</span><span class="count">${books.length}</span>`;
-    allItem.onclick = () => { currentFilter = 'all'; renderAll(); };
-    categoryList.appendChild(allItem);
 
-    categories.forEach(c => {
-      const count = books.filter(b => b.category === c.name).length;
-      const li = document.createElement('li');
-      li.className = 'category-item' + (currentFilter === c.name ? ' active' : '');
-      li.innerHTML = `
-        <span class="cat-name">${escapeHtml(c.name)}</span>
-        <button class="cat-del" data-id="${c.id}" data-name="${escapeHtml(c.name)}" title="삭제"><i data-lucide="x"></i></button>
-        <span class="count">${count}</span>
+    const allRow = document.createElement('li');
+    allRow.innerHTML = `
+      <div class="cat-row ${currentFilter === 'all' ? 'active' : ''}">
+        <span class="cat-toggle-spacer"></span>
+        <span class="cat-name">전체보기</span>
+        <span class="count">${books.length}</span>
+      </div>`;
+    allRow.querySelector('.cat-row').addEventListener('click', () => { currentFilter = 'all'; renderAll(); });
+    categoryList.appendChild(allRow);
+
+    const byParent = buildCategoryChildrenMap();
+
+    function renderNode(cat, depth) {
+      const children = byParent[cat.id] || [];
+      const hasChildren = children.length > 0;
+      const isOpen = expandedCatIds.has(cat.id);
+      const count = countBooksForCategory(cat.name);
+
+      const node = document.createElement('li');
+      node.className = 'cat-node';
+      node.style.marginLeft = depth > 0 ? '0' : '0';
+      node.innerHTML = `
+        <div class="cat-row ${currentFilter === cat.name ? 'active' : ''}" data-name="${escapeHtml(cat.name)}">
+          ${hasChildren
+            ? `<button type="button" class="cat-toggle ${isOpen ? 'open' : ''}" data-id="${cat.id}"><i data-lucide="chevron-right"></i></button>`
+            : '<span class="cat-toggle-spacer"></span>'}
+          <span class="cat-name">${escapeHtml(cat.name)}</span>
+          <button type="button" class="cat-add-sub" data-id="${cat.id}" data-name="${escapeHtml(cat.name)}" title="하위 카테고리 추가"><i data-lucide="plus"></i></button>
+          <button type="button" class="cat-del" data-id="${cat.id}" data-name="${escapeHtml(cat.name)}" title="삭제"><i data-lucide="x"></i></button>
+          <span class="count">${count}</span>
+        </div>
+        <ul class="cat-children ${isOpen ? '' : 'collapsed'}" data-parent="${cat.id}"></ul>
       `;
-      li.addEventListener('click', (e) => {
-        if (e.target.closest('.cat-del')) { e.stopPropagation(); deleteCategory(c.id, c.name); return; }
-        currentFilter = c.name;
+
+      node.querySelector('.cat-row').addEventListener('click', (e) => {
+        if (e.target.closest('.cat-toggle') || e.target.closest('.cat-add-sub') || e.target.closest('.cat-del')) return;
+        currentFilter = cat.name;
         renderAll();
       });
-      categoryList.appendChild(li);
-    });
+      const toggleBtn = node.querySelector('.cat-toggle');
+      if (toggleBtn) {
+        toggleBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (expandedCatIds.has(cat.id)) expandedCatIds.delete(cat.id);
+          else expandedCatIds.add(cat.id);
+          renderCategoryList();
+        });
+      }
+      node.querySelector('.cat-add-sub').addEventListener('click', (e) => {
+        e.stopPropagation();
+        openCategoryModal(cat.id, cat.name);
+      });
+      node.querySelector('.cat-del').addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteCategory(cat.id, cat.name);
+      });
+
+      if (hasChildren) {
+        const childrenUl = node.querySelector('.cat-children');
+        children.forEach(child => childrenUl.appendChild(renderNode(child, depth + 1)));
+      }
+      return node;
+    }
+
+    (byParent.root || []).forEach(cat => categoryList.appendChild(renderNode(cat, 0)));
     refreshIcons();
   }
 
   function getFilteredBooks() {
-    let list = currentFilter === 'all' ? books : books.filter(b => b.category === currentFilter);
+    let list = books;
+    if (currentTypeFilter !== 'all') {
+      list = list.filter(b => (b.type || 'book') === currentTypeFilter);
+    }
+    if (currentFilter !== 'all') {
+      const allowedNames = new Set(getDescendantAndSelfNames(currentFilter));
+      list = list.filter(b => allowedNames.has(b.category));
+    }
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
       list = list.filter(b =>
@@ -390,6 +558,21 @@
         stripHtml(b.note).toLowerCase().includes(q) ||
         (b.author || '').toLowerCase().includes(q)
       );
+    }
+    list = [...list];
+    switch (currentSort) {
+      case 'rating_desc':
+        list.sort((a, b) => (b.rating || 0) - (a.rating || 0) || (b.date || '').localeCompare(a.date || ''));
+        break;
+      case 'rating_asc':
+        list.sort((a, b) => (a.rating || 0) - (b.rating || 0) || (b.date || '').localeCompare(a.date || ''));
+        break;
+      case 'date_asc':
+        list.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+        break;
+      case 'date_desc':
+      default:
+        list.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     }
     return list;
   }
@@ -418,7 +601,7 @@
     bookGridWrap.innerHTML = `<div class="book-grid">${filtered.map(b => `
       <div class="book-card" data-id="${b.id}">
         <button class="book-del" data-id="${b.id}" title="삭제"><i data-lucide="x"></i></button>
-        <div class="book-cover-placeholder">${b.coverUrl ? `<img src="${b.coverUrl}" alt="cover">` : '<i data-lucide="book"></i>'}</div>
+        <div class="book-cover-placeholder">${b.coverUrl ? `<img src="${b.coverUrl}" alt="cover">` : `<i data-lucide="${(TYPE_META[b.type] || TYPE_META.book).icon}"></i>`}</div>
         <div class="book-info">
           <div>
             <div class="book-title">${escapeHtml(b.title)}</div>
@@ -426,7 +609,8 @@
             <div class="book-meta">
               <div class="rating">${starsInlineHtml(b.rating)}</div>
               <div class="card-bottom-row">
-                ${b.status && b.status !== 'done' ? `<span class="status-badge ${b.status}">${escapeHtml(STATUS_LABELS[b.status] || '')}</span>` : ''}
+                ${b.type && b.type !== 'book' ? `<span class="type-badge"><i data-lucide="${TYPE_META[b.type].icon}"></i>${escapeHtml(TYPE_META[b.type].label)}</span>` : ''}
+                ${b.status && b.status !== 'done' ? `<span class="status-badge ${b.status}">${escapeHtml((TYPE_META[b.type] || TYPE_META.book).statusLabels[b.status] || '')}</span>` : ''}
                 ${b.category ? `<span class="cat-tag">${escapeHtml(b.category)}</span>` : ''}
                 ${b.date ? `<span class="date-badge"><i data-lucide="calendar"></i><span>${fmtDate(b.date)}</span></span>` : ''}
               </div>
@@ -471,21 +655,22 @@
     }
     detailArticle.innerHTML = `
       <div class="detail-cover-row">
-        <div class="detail-cover">${b.coverUrl ? `<img src="${b.coverUrl}" alt="cover">` : '<i data-lucide="book"></i>'}</div>
+        <div class="detail-cover">${b.coverUrl ? `<img src="${b.coverUrl}" alt="cover">` : `<i data-lucide="${(TYPE_META[b.type] || TYPE_META.book).icon}"></i>`}</div>
       </div>
       <h1 class="detail-title">${escapeHtml(b.title)}</h1>
       ${b.author ? `<div class="detail-author">${escapeHtml(b.author)}</div>` : ''}
       ${b.summary ? `<p class="detail-summary">${escapeHtml(b.summary)}</p>` : ''}
       <div class="detail-meta-row">
         <div class="detail-stars">${starsHtml}</div>
-        ${b.status && b.status !== 'done' ? `<span class="status-badge ${b.status}">${escapeHtml(STATUS_LABELS[b.status] || '')}</span>` : ''}
+        ${b.type && b.type !== 'book' ? `<span class="type-badge"><i data-lucide="${TYPE_META[b.type].icon}"></i>${escapeHtml(TYPE_META[b.type].label)}</span>` : ''}
+        ${b.status && b.status !== 'done' ? `<span class="status-badge ${b.status}">${escapeHtml((TYPE_META[b.type] || TYPE_META.book).statusLabels[b.status] || '')}</span>` : ''}
         ${b.category ? `<span class="cat-tag">${escapeHtml(b.category)}</span>` : ''}
         ${b.date ? `<span class="date-badge"><i data-lucide="calendar"></i><span>${fmtDate(b.date)}</span></span>` : ''}
       </div>
       ${b.readDates && b.readDates.length > 0 ? `
         <div class="detail-read-dates">
           <i data-lucide="calendar-days"></i>
-          <span>읽은 날: ${b.readDates.map(rd => fmtDate(rd.date) + (rd.pages ? `(${rd.pages}쪽)` : '')).join(', ')}</span>
+          <span>${b.type && b.type !== 'book' ? '본 날' : '읽은 날'}: ${b.readDates.map(rd => fmtDate(rd.date) + (rd.pages ? `(${rd.pages})` : '')).join(', ')}</span>
         </div>
       ` : ''}
       <div class="detail-body ${b.note ? '' : 'empty'}">${b.note ? b.note : '아직 남긴 기록이 없어요. 연필 아이콘을 눌러 기록을 추가해보세요.'}</div>
@@ -522,6 +707,7 @@
     inDate.value = todayStr();
     quill.setContents([]);
     setRating(0);
+    setType('book');
     setStatus('done');
     currentReadDates = [];
     renderReadDatesList();
@@ -543,6 +729,7 @@
     inDate.value = b.date || todayStr();
     quill.root.innerHTML = b.note || '';
     setRating(b.rating || 0);
+    setType(b.type || 'book');
     setStatus(b.status || 'done');
     currentReadDates = (b.readDates || []).map(rd => ({ date: rd.date, pages: rd.pages || 0 }));
     renderReadDatesList();
@@ -568,6 +755,7 @@
       note: noteHtml,
       coverUrl: currentCoverUrl || '',
       status: currentStatus,
+      type: currentType,
       readDates: currentReadDates,
     };
     try {
@@ -603,26 +791,50 @@
     catch (err) { console.error(err); }
   }
 
+  function openCategoryModal(parentId, parentName) {
+    pendingParentId = parentId || null;
+    inCatName.value = '';
+    if (pendingParentId) {
+      catModalTitle.textContent = '하위 카테고리 추가';
+      catParentHint.textContent = `'${parentName}' 아래에 추가돼요.`;
+      catParentHint.style.display = 'block';
+    } else {
+      catModalTitle.textContent = '새 카테고리';
+      catParentHint.style.display = 'none';
+    }
+    catOverlay.classList.add('show');
+    setTimeout(() => inCatName.focus(), 50);
+  }
+
   async function addCategory() {
     const name = inCatName.value.trim();
     if (!name) { inCatName.focus(); return; }
-    if (categories.some(c => c.name === name)) { catOverlay.classList.remove('show'); return; }
+    if (categories.some(c => c.name === name && c.parentId === pendingParentId)) {
+      catOverlay.classList.remove('show');
+      return;
+    }
     try {
       const cat = await api('/api/categories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, parentId: pendingParentId }),
       });
       categories.push(cat);
+      if (pendingParentId) expandedCatIds.add(pendingParentId);
       catOverlay.classList.remove('show');
       renderAll();
     } catch (err) { console.error(err); }
   }
 
   async function deleteCategory(id, name) {
-    if (!confirm(`'${name}' 카테고리를 삭제할까요?\n(이 카테고리로 기록된 책은 남아있어요)`)) return;
-    categories = categories.filter(c => c.id !== id);
-    if (currentFilter === name) currentFilter = 'all';
+    const hasChildren = categories.some(c => c.parentId === id);
+    const msg = hasChildren
+      ? `'${name}' 카테고리를 삭제할까요?\n하위 카테고리도 전부 함께 삭제돼요. (책 기록 자체는 남아있어요)`
+      : `'${name}' 카테고리를 삭제할까요?\n(이 카테고리로 기록된 책은 남아있어요)`;
+    if (!confirm(msg)) return;
+    const toRemove = new Set(getDescendantAndSelfNames(name));
+    categories = categories.filter(c => !toRemove.has(c.name));
+    if (toRemove.has(currentFilter)) currentFilter = 'all';
     renderAll();
     try { await api(`/api/categories/${id}`, { method: 'DELETE' }); }
     catch (err) { console.error(err); }
@@ -633,17 +845,21 @@
   $('#btnSave').addEventListener('click', saveBook);
   bookOverlay.addEventListener('click', (e) => { if (e.target === bookOverlay) closeBookModal(); });
 
-  $('#addCategoryBtn').addEventListener('click', () => {
-    inCatName.value = '';
-    catOverlay.classList.add('show');
-    setTimeout(() => inCatName.focus(), 50);
-  });
+  $('#addCategoryBtn').addEventListener('click', () => openCategoryModal(null, null));
   $('#btnCatCancel').addEventListener('click', () => catOverlay.classList.remove('show'));
   $('#btnCatSave').addEventListener('click', addCategory);
   catOverlay.addEventListener('click', (e) => { if (e.target === catOverlay) catOverlay.classList.remove('show'); });
   inCatName.addEventListener('keydown', (e) => { if (e.key === 'Enter') addCategory(); });
 
   searchInput.addEventListener('input', (e) => { searchQuery = e.target.value; renderBookGrid(); });
+  sortSelect.addEventListener('change', (e) => { currentSort = e.target.value; renderBookGrid(); });
+  typeFilterBar.addEventListener('click', (e) => {
+    const t = e.target.closest('.type-chip');
+    if (!t) return;
+    currentTypeFilter = t.dataset.type;
+    typeFilterBar.querySelectorAll('.type-chip').forEach(chip => chip.classList.toggle('active', chip === t));
+    renderBookGrid();
+  });
 
   // ---------- Stats panel ----------
   function fmtTodayLabel(dateStr) {
@@ -700,8 +916,10 @@
 
   async function loadStats() {
     try {
-      const stats = await api('/api/stats');
+      const qs = currentStatsType !== 'all' ? `?type=${currentStatsType}` : '';
+      const stats = await api(`/api/stats${qs}`);
       statsTotalNum.textContent = stats.totalBooks;
+      statsTotalLabel.textContent = currentStatsType === 'all' ? '개 완료' : TYPE_META[currentStatsType].statsLabel;
       renderStatsChart(stats.byYear);
     } catch (err) {
       console.error(err);
@@ -723,6 +941,13 @@
 
   statsBtn.addEventListener('click', () => {
     statsOverlay.classList.add('show');
+    loadStats();
+  });
+  statsTypeTabs.addEventListener('click', (e) => {
+    const t = e.target.closest('.status-pick');
+    if (!t) return;
+    currentStatsType = t.dataset.type;
+    statsTypeTabs.querySelectorAll('.status-pick').forEach(btn => btn.classList.toggle('active', btn === t));
     loadStats();
   });
   $('#btnStatsClose').addEventListener('click', () => statsOverlay.classList.remove('show'));
