@@ -29,6 +29,17 @@
   const inCatName = $('#inCatName');
   const searchInput = $('#searchInput');
 
+  const statsOverlay = $('#statsOverlay');
+  const statsBtn = $('#statsBtn');
+  const statsTotalNum = $('#statsTotalNum');
+  const statsChartCanvas = $('#statsChart');
+  const statsEmpty = $('#statsEmpty');
+  const todayDateLabel = $('#todayDateLabel');
+  const todayViewStatus = $('#todayViewStatus');
+  const todayReadCheck = $('#todayReadCheck');
+  const todayPages = $('#todayPages');
+  let statsChart = null;
+
   const adminOverlay = $('#adminOverlay');
   const adminToggleBtn = $('#adminToggleBtn');
   const adminToggleIcon = $('#adminToggleIcon');
@@ -541,6 +552,105 @@
   inCatName.addEventListener('keydown', (e) => { if (e.key === 'Enter') addCategory(); });
 
   searchInput.addEventListener('input', (e) => { searchQuery = e.target.value; renderBookGrid(); });
+
+  // ---------- Stats panel ----------
+  function fmtTodayLabel(dateStr) {
+    const d = new Date(dateStr + 'T00:00:00');
+    const days = ['일', '월', '화', '수', '목', '금', '토'];
+    return `${dateStr.replaceAll('-', '.')} (${days[d.getDay()]}) · 오늘`;
+  }
+
+  function renderStatsChart(byYear) {
+    if (!byYear || byYear.length === 0) {
+      statsChartCanvas.style.display = 'none';
+      statsEmpty.style.display = 'block';
+      if (statsChart) { statsChart.destroy(); statsChart = null; }
+      return;
+    }
+    statsChartCanvas.style.display = 'block';
+    statsEmpty.style.display = 'none';
+
+    const styles = getComputedStyle(document.body);
+    const inkColor = styles.getPropertyValue('--ink').trim() || '#1a1a1a';
+    const gridColor = styles.getPropertyValue('--border').trim() || '#e9ecef';
+    const softColor = styles.getPropertyValue('--ink-faint').trim() || '#868e96';
+
+    const labels = byYear.map(r => r.year + '년');
+    const data = byYear.map(r => r.count);
+
+    if (statsChart) statsChart.destroy();
+    statsChart = new Chart(statsChartCanvas.getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          data,
+          backgroundColor: inkColor,
+          borderRadius: 6,
+          maxBarThickness: 40,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: softColor } },
+          y: {
+            beginAtZero: true,
+            ticks: { color: softColor, precision: 0 },
+            grid: { color: gridColor },
+          },
+        },
+      },
+    });
+  }
+
+  async function loadStats() {
+    try {
+      const stats = await api('/api/stats');
+      statsTotalNum.textContent = stats.totalBooks;
+      renderStatsChart(stats.byYear);
+    } catch (err) {
+      console.error(err);
+    }
+
+    const today = todayStr();
+    todayDateLabel.textContent = fmtTodayLabel(today);
+    try {
+      const log = await api(`/api/daily-logs/${today}`);
+      todayReadCheck.checked = !!log.read;
+      todayPages.value = log.pages || '';
+      todayViewStatus.textContent = log.read
+        ? `오늘 읽었어요${log.pages ? ` · ${log.pages}쪽` : ''}`
+        : '오늘은 아직 안 읽었어요';
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  statsBtn.addEventListener('click', () => {
+    statsOverlay.classList.add('show');
+    loadStats();
+  });
+  $('#btnStatsClose').addEventListener('click', () => statsOverlay.classList.remove('show'));
+  statsOverlay.addEventListener('click', (e) => { if (e.target === statsOverlay) statsOverlay.classList.remove('show'); });
+
+  $('#btnTodaySave').addEventListener('click', async () => {
+    const today = todayStr();
+    try {
+      const saved = await api(`/api/daily-logs/${today}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ read: todayReadCheck.checked, pages: Number(todayPages.value) || 0 }),
+      });
+      todayViewStatus.textContent = saved.read
+        ? `오늘 읽었어요${saved.pages ? ` · ${saved.pages}쪽` : ''}`
+        : '오늘은 아직 안 읽었어요';
+    } catch (err) {
+      console.error(err);
+    }
+  });
 
   refreshIcons();
   initQuill();

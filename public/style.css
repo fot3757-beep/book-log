@@ -169,6 +169,41 @@ header {
 }
 .write-btn svg { width: 18px; height: 18px; }
 .write-btn:hover { background-color: var(--accent-hover); }
+.header-actions { display: flex; gap: 10px; flex: none; }
+.stats-btn { background-color: var(--surface); color: var(--ink-soft); border: 1px solid var(--border); }
+.stats-btn:hover { background-color: var(--chip-bg); }
+
+/* ---------- Stats panel ---------- */
+.stats-summary { display: flex; justify-content: center; margin-bottom: 20px; }
+.stats-total {
+  display: flex; align-items: baseline; gap: 6px; background: var(--chip-bg);
+  padding: 14px 28px; border-radius: 999px;
+}
+.stats-total-num { font-size: 2.1rem; font-weight: 800; color: var(--ink); line-height: 1; }
+.stats-total-label { font-size: 0.9rem; color: var(--ink-faint); font-weight: 600; }
+
+.stats-chart-wrap { position: relative; margin-bottom: 24px; min-height: 60px; }
+.stats-empty { text-align: center; color: var(--ink-faintest); font-size: 0.85rem; padding: 20px 0; }
+
+.today-box {
+  background: var(--chip-bg); border-radius: var(--radius-md); padding: 16px 18px; margin-bottom: 4px;
+}
+.today-head { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: 700; color: var(--ink-soft); margin-bottom: 10px; }
+.today-head svg { width: 16px; height: 16px; }
+
+.today-view-status { font-size: 0.92rem; color: var(--ink-soft); }
+body.is-admin .today-view { display: none; }
+
+.today-edit { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+.today-checkbox { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: var(--ink); cursor: pointer; }
+.today-checkbox input { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; }
+.today-pages-row { display: flex; align-items: center; gap: 10px; }
+.today-pages-row label { font-size: 0.85rem; color: var(--ink-faint); flex: none; }
+.today-pages-row input {
+  width: 100px; border: 1px solid var(--border); background: var(--surface); color: var(--ink);
+  border-radius: var(--radius-md); padding: 8px 12px; font-size: 0.9rem; font-family: inherit; outline: none;
+}
+.today-edit .btn { flex: none; align-self: flex-start; padding: 9px 18px; }
 
 .book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
 

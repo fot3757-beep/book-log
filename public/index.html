@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css">
 <script src="https://cdn.jsdelivr.net/npm/lucide@0.525.0/dist/umd/lucide.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -44,10 +45,16 @@
         <i data-lucide="search"></i>
         <input type="text" id="searchInput" placeholder="책 제목, 코멘트 검색...">
       </div>
-      <button class="write-btn admin-only" id="writeBtn">
-        <i data-lucide="square-pen"></i>
-        <span>기록하기</span>
-      </button>
+      <div class="header-actions">
+        <button class="write-btn stats-btn" id="statsBtn">
+          <i data-lucide="bar-chart-3"></i>
+          <span>통계</span>
+        </button>
+        <button class="write-btn admin-only" id="writeBtn">
+          <i data-lucide="square-pen"></i>
+          <span>기록하기</span>
+        </button>
+      </div>
     </header>
 
     <div id="bookGridWrap"></div>
@@ -154,6 +161,52 @@
     </div>
   </div>
   <article class="detail-article" id="detailArticle"></article>
+</div>
+
+<!-- 통계 패널 -->
+<div class="overlay" id="statsOverlay">
+  <div class="modal modal-wide">
+    <h2>독서 통계</h2>
+
+    <div class="stats-summary">
+      <div class="stats-total">
+        <span class="stats-total-num" id="statsTotalNum">0</span>
+        <span class="stats-total-label">권 완독</span>
+      </div>
+    </div>
+
+    <div class="stats-chart-wrap">
+      <canvas id="statsChart" height="180"></canvas>
+      <p class="stats-empty" id="statsEmpty" style="display:none;">아직 연도별로 볼 기록이 없어요.</p>
+    </div>
+
+    <div class="today-box">
+      <div class="today-head">
+        <i data-lucide="calendar-check"></i>
+        <span id="todayDateLabel">오늘</span>
+      </div>
+
+      <div class="today-view" id="todayView">
+        <span class="today-view-status" id="todayViewStatus">—</span>
+      </div>
+
+      <div class="today-edit admin-only" id="todayEdit">
+        <label class="today-checkbox">
+          <input type="checkbox" id="todayReadCheck">
+          <span>오늘 읽었어요</span>
+        </label>
+        <div class="today-pages-row">
+          <label for="todayPages">오늘 읽은 쪽수</label>
+          <input type="number" id="todayPages" min="0" placeholder="0">
+        </div>
+        <button class="btn btn-solid" id="btnTodaySave">저장</button>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="btnStatsClose">닫기</button>
+    </div>
+  </div>
 </div>
 
 <script src="app.js"></script>
