@@ -58,6 +58,18 @@ db.exec(`
   );
 `);
 
+// 마이그레이션: 기존에 만들어둔 DB에는 status 컬럼이 없을 수 있으니 없으면 추가
+// (이미 등록된 책들은 전부 '다 읽었어요'로 취급해서 기존 통계와 어긋나지 않게 함)
+const bookColumns = db.prepare('PRAGMA table_info(books)').all().map(c => c.name);
+if (!bookColumns.includes('status')) {
+  db.exec("ALTER TABLE books ADD COLUMN status TEXT DEFAULT 'done'");
+}
+
+const VALID_STATUSES = ['want', 'reading', 'done'];
+function normalizeStatus(s) {
+  return VALID_STATUSES.includes(s) ? s : 'done';
+}
+
 // ---------------------------------------------------------------------------
 // 앱 설정
 // ---------------------------------------------------------------------------
@@ -157,6 +169,7 @@ function rowToBook(r) {
     date: r.date,
     note: r.note,
     coverUrl: r.cover_url,
+    status: r.status || 'done',
     createdAt: r.created_at,
   };
 }
@@ -182,11 +195,12 @@ app.post('/api/books', requireAdmin, (req, res) => {
     date: b.date || new Date().toISOString().slice(0, 10),
     note: sanitizeNote(b.note),
     cover_url: b.coverUrl || '',
+    status: normalizeStatus(b.status),
     created_at: createdAt,
   };
   db.prepare(`
-    INSERT INTO books (id, title, author, category, rating, date, note, cover_url, created_at)
-    VALUES (@id, @title, @author, @category, @rating, @date, @note, @cover_url, @created_at)
+    INSERT INTO books (id, title, author, category, rating, date, note, cover_url, status, created_at)
+    VALUES (@id, @title, @author, @category, @rating, @date, @note, @cover_url, @status, @created_at)
   `).run(row);
 
   res.json(rowToBook(row));
@@ -209,10 +223,11 @@ app.put('/api/books/:id', requireAdmin, (req, res) => {
     date: b.date || existing.date,
     note: sanitizeNote(b.note),
     cover_url: b.coverUrl !== undefined ? b.coverUrl : existing.cover_url,
+    status: b.status !== undefined ? normalizeStatus(b.status) : (existing.status || 'done'),
   };
   db.prepare(`
     UPDATE books SET title=@title, author=@author, category=@category, rating=@rating,
-      date=@date, note=@note, cover_url=@cover_url WHERE id=@id
+      date=@date, note=@note, cover_url=@cover_url, status=@status WHERE id=@id
   `).run(updated);
 
   const row = db.prepare('SELECT * FROM books WHERE id = ?').get(req.params.id);
@@ -228,11 +243,11 @@ app.delete('/api/books/:id', requireAdmin, (req, res) => {
 // API: 통계 (누적 권수 + 연도별 그래프) — 누구나 조회 가능
 // ---------------------------------------------------------------------------
 app.get('/api/stats', (req, res) => {
-  const totalBooks = db.prepare('SELECT COUNT(*) AS c FROM books').get().c;
+  const totalBooks = db.prepare("SELECT COUNT(*) AS c FROM books WHERE status = 'done'").get().c;
   const byYear = db.prepare(`
     SELECT substr(date, 1, 4) AS year, COUNT(*) AS count
     FROM books
-    WHERE date IS NOT NULL AND date != ''
+    WHERE status = 'done' AND date IS NOT NULL AND date != ''
     GROUP BY year
     ORDER BY year ASC
   `).all().filter(r => /^\d{4}$/.test(r.year));
