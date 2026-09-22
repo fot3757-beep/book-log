@@ -270,6 +270,30 @@ header {
 .status-badge.want { background: var(--tag-bg); color: var(--ink-faint); }
 .status-badge.reading { background: var(--ink); color: var(--accent-contrast); }
 
+/* ---------- Read dates (여러 날짜 기록) ---------- */
+.read-dates-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.read-date-chip {
+  display: inline-flex; align-items: center; gap: 6px; background: var(--chip-bg);
+  border: 1px solid var(--border); padding: 6px 6px 6px 12px; border-radius: 999px;
+  font-size: 0.82rem; color: var(--ink-soft);
+}
+.read-date-chip .rd-pages { color: var(--ink-faint); }
+.read-date-chip .rd-del {
+  width: 18px; height: 18px; border-radius: 50%; border: none; background: var(--tag-bg);
+  color: var(--ink-faint); display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.read-date-chip .rd-del svg { width: 10px; height: 10px; }
+.read-dates-empty { font-size: 0.82rem; color: var(--ink-faintest); }
+
+.read-dates-add-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.read-dates-add-row input[type="date"],
+.read-dates-add-row input[type="number"] {
+  border: 1px solid var(--border); background: var(--chip-bg); color: var(--ink);
+  border-radius: var(--radius-md); padding: 8px 12px; font-size: 0.85rem; font-family: inherit; outline: none;
+}
+.read-dates-add-row input[type="number"] { width: 110px; }
+.read-dates-add-row .cover-btn { flex: none; }
+
 .book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
 
 .book-card {
@@ -426,6 +450,10 @@ header {
 
 .detail-title { font-size: 1.7rem; font-weight: 700; line-height: 1.4; text-align: center; margin-bottom: 6px; letter-spacing: -0.01em; }
 .detail-author { text-align: center; font-size: 0.92rem; color: var(--ink-faint); margin-bottom: 18px; }
+.detail-summary {
+  text-align: center; font-size: 1rem; color: var(--ink-soft); font-style: italic;
+  line-height: 1.6; margin: 0 auto 22px; max-width: 480px;
+}
 .detail-meta-row {
   display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;
   margin-bottom: 28px; padding-bottom: 24px; border-bottom: 1px solid var(--border);
@@ -433,6 +461,12 @@ header {
 .detail-stars { display: flex; gap: 3px; }
 .detail-stars svg { width: 17px; height: 17px; color: var(--tag-bg); }
 .detail-stars svg.on { color: var(--ink); fill: currentColor; }
+
+.detail-read-dates {
+  display: flex; align-items: flex-start; gap: 6px; font-size: 0.78rem; color: var(--ink-faint);
+  margin: -20px 0 28px; line-height: 1.6;
+}
+.detail-read-dates svg { width: 14px; height: 14px; flex: none; margin-top: 2px; }
 
 /* 에디터에서 쓴 서식이 블로그처럼 보이도록 하는 타이포그래피 */
 .detail-body { font-size: 1.02rem; line-height: 1.9; color: var(--ink-soft); word-break: keep-all; }

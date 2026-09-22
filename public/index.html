@@ -118,6 +118,11 @@
     </div>
 
     <div class="field">
+      <label>한 줄 코멘트 (선택, 목록/전체화면에 요약으로 보여요)</label>
+      <input type="text" id="inSummary" maxlength="120" placeholder="예: 일단 읽고 있는 중.... 어려운 과학 용어가 많다">
+    </div>
+
+    <div class="field">
       <label>별점</label>
       <div class="star-picker" id="starPicker"></div>
     </div>
@@ -125,6 +130,17 @@
     <div class="field">
       <label>기록 (블로그처럼 자유롭게 써보세요)</label>
       <div id="noteEditor" class="note-editor"></div>
+    </div>
+
+    <div class="field">
+      <label>읽은 날짜 (하루에 다 못 읽었다면 여러 날짜를 나눠서 추가하세요)</label>
+      <div class="read-dates-list" id="readDatesList"></div>
+      <div class="read-dates-add-row">
+        <input type="date" id="inReadDateNew">
+        <input type="number" id="inReadPagesNew" placeholder="쪽수(선택)" min="0">
+        <button type="button" class="cover-btn" id="btnAddReadDate"><i data-lucide="plus"></i><span>추가</span></button>
+      </div>
+      <p class="cover-hint">여기에 추가한 날짜들이 캘린더에 이 책 표지로 표시돼요. 하나도 안 넣으면 위의 '날짜' 하나만 캘린더에 반영돼요.</p>
     </div>
 
     <div class="modal-actions">

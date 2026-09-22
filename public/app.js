@@ -7,6 +7,7 @@
   let currentRating = 0;
   let currentCoverUrl = null;
   let currentStatus = 'done';
+  let currentReadDates = []; // [{date, pages}]
   let detailId = null;
   let quill = null;
   let isAdmin = false;
@@ -24,6 +25,7 @@
   const modalTitle = $('#modalTitle');
   const inTitle = $('#inTitle');
   const inAuthor = $('#inAuthor');
+  const inSummary = $('#inSummary');
   const inCategory = $('#inCategory');
   const inDate = $('#inDate');
   const starPicker = $('#starPicker');
@@ -31,6 +33,10 @@
   const searchInput = $('#searchInput');
   const statusPicker = $('#statusPicker');
   const dateFieldLabel = $('#dateFieldLabel');
+  const readDatesList = $('#readDatesList');
+  const inReadDateNew = $('#inReadDateNew');
+  const inReadPagesNew = $('#inReadPagesNew');
+  const btnAddReadDate = $('#btnAddReadDate');
 
   const statsOverlay = $('#statsOverlay');
   const statsBtn = $('#statsBtn');
@@ -185,6 +191,43 @@
   statusPicker.addEventListener('click', (e) => {
     const t = e.target.closest('.status-pick');
     if (t) setStatus(t.dataset.status);
+  });
+
+  // ---------- Read dates (한 책을 여러 날 나눠 읽은 기록) ----------
+  function renderReadDatesList() {
+    if (currentReadDates.length === 0) {
+      readDatesList.innerHTML = '<span class="read-dates-empty">아직 추가한 날짜가 없어요.</span>';
+      return;
+    }
+    const sorted = [...currentReadDates].sort((a, b) => a.date.localeCompare(b.date));
+    readDatesList.innerHTML = sorted.map(rd => `
+      <span class="read-date-chip" data-date="${rd.date}">
+        ${fmtDate(rd.date)}${rd.pages ? `<span class="rd-pages">· ${rd.pages}쪽</span>` : ''}
+        <button type="button" class="rd-del" data-date="${rd.date}"><i data-lucide="x"></i></button>
+      </span>
+    `).join('');
+    readDatesList.querySelectorAll('.rd-del').forEach(btn => {
+      btn.addEventListener('click', () => {
+        currentReadDates = currentReadDates.filter(rd => rd.date !== btn.dataset.date);
+        renderReadDatesList();
+      });
+    });
+    refreshIcons();
+  }
+
+  btnAddReadDate.addEventListener('click', () => {
+    const date = inReadDateNew.value;
+    if (!date) { inReadDateNew.focus(); return; }
+    const pages = Number(inReadPagesNew.value) || 0;
+    const existing = currentReadDates.find(rd => rd.date === date);
+    if (existing) {
+      existing.pages = pages;
+    } else {
+      currentReadDates.push({ date, pages });
+    }
+    inReadDateNew.value = '';
+    inReadPagesNew.value = '';
+    renderReadDatesList();
   });
 
   function escapeHtml(s) {
@@ -343,6 +386,7 @@
       const q = searchQuery.trim().toLowerCase();
       list = list.filter(b =>
         (b.title || '').toLowerCase().includes(q) ||
+        (b.summary || '').toLowerCase().includes(q) ||
         stripHtml(b.note).toLowerCase().includes(q) ||
         (b.author || '').toLowerCase().includes(q)
       );
@@ -388,7 +432,7 @@
               </div>
             </div>
           </div>
-          ${b.note ? `<div class="comment">${escapeHtml(stripHtml(b.note))}</div>` : ''}
+          ${(b.summary || b.note) ? `<div class="comment">${escapeHtml(b.summary || stripHtml(b.note))}</div>` : ''}
         </div>
       </div>
     `).join('')}</div>`;
@@ -431,12 +475,19 @@
       </div>
       <h1 class="detail-title">${escapeHtml(b.title)}</h1>
       ${b.author ? `<div class="detail-author">${escapeHtml(b.author)}</div>` : ''}
+      ${b.summary ? `<p class="detail-summary">${escapeHtml(b.summary)}</p>` : ''}
       <div class="detail-meta-row">
         <div class="detail-stars">${starsHtml}</div>
         ${b.status && b.status !== 'done' ? `<span class="status-badge ${b.status}">${escapeHtml(STATUS_LABELS[b.status] || '')}</span>` : ''}
         ${b.category ? `<span class="cat-tag">${escapeHtml(b.category)}</span>` : ''}
         ${b.date ? `<span class="date-badge"><i data-lucide="calendar"></i><span>${fmtDate(b.date)}</span></span>` : ''}
       </div>
+      ${b.readDates && b.readDates.length > 0 ? `
+        <div class="detail-read-dates">
+          <i data-lucide="calendar-days"></i>
+          <span>읽은 날: ${b.readDates.map(rd => fmtDate(rd.date) + (rd.pages ? `(${rd.pages}쪽)` : '')).join(', ')}</span>
+        </div>
+      ` : ''}
       <div class="detail-body ${b.note ? '' : 'empty'}">${b.note ? b.note : '아직 남긴 기록이 없어요. 연필 아이콘을 눌러 기록을 추가해보세요.'}</div>
     `;
     refreshIcons();
@@ -467,10 +518,13 @@
     modalTitle.textContent = '새 기록 추가';
     inTitle.value = '';
     inAuthor.value = '';
+    inSummary.value = '';
     inDate.value = todayStr();
     quill.setContents([]);
     setRating(0);
     setStatus('done');
+    currentReadDates = [];
+    renderReadDatesList();
     setCoverPreview(null);
     renderCategoryOptions();
     if (currentFilter !== 'all') inCategory.value = currentFilter;
@@ -485,10 +539,13 @@
     modalTitle.textContent = '기록 수정';
     inTitle.value = b.title || '';
     inAuthor.value = b.author || '';
+    inSummary.value = b.summary || '';
     inDate.value = b.date || todayStr();
     quill.root.innerHTML = b.note || '';
     setRating(b.rating || 0);
     setStatus(b.status || 'done');
+    currentReadDates = (b.readDates || []).map(rd => ({ date: rd.date, pages: rd.pages || 0 }));
+    renderReadDatesList();
     setCoverPreview(b.coverUrl || null);
     renderCategoryOptions();
     if (b.category) inCategory.value = b.category;
@@ -504,12 +561,14 @@
     const payload = {
       title,
       author: inAuthor.value.trim(),
+      summary: inSummary.value.trim(),
       category: inCategory.value || '',
       rating: currentRating,
       date: inDate.value || todayStr(),
       note: noteHtml,
       coverUrl: currentCoverUrl || '',
       status: currentStatus,
+      readDates: currentReadDates,
     };
     try {
       let saved;
@@ -694,10 +753,18 @@
 
   function booksByDate() {
     const map = {};
+    function addToDate(dateStr, book) {
+      if (!dateStr) return;
+      if (!map[dateStr]) map[dateStr] = [];
+      if (!map[dateStr].some(b => b.id === book.id)) map[dateStr].push(book);
+    }
     books.forEach(b => {
-      if (!b.date || b.status === 'want') return; // '읽고 싶어요'는 아직 읽은 게 아니라 달력에 표시 안 함
-      if (!map[b.date]) map[b.date] = [];
-      map[b.date].push(b);
+      if (b.status === 'want') return; // '읽고 싶어요'는 아직 읽은 게 아니라 달력에 표시 안 함
+      if (b.readDates && b.readDates.length > 0) {
+        b.readDates.forEach(rd => addToDate(rd.date, b));
+      } else if (b.date) {
+        addToDate(b.date, b);
+      }
     });
     return map;
   }
