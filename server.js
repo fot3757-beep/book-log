@@ -56,6 +56,15 @@ db.exec(`
     pages INTEGER DEFAULT 0,
     updated_at INTEGER NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS reading_dates (
+    id TEXT PRIMARY KEY,
+    book_id TEXT NOT NULL,
+    date TEXT NOT NULL,
+    pages INTEGER DEFAULT 0,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_reading_dates_book_id ON reading_dates(book_id);
 `);
 
 // 마이그레이션: 기존에 만들어둔 DB에는 status 컬럼이 없을 수 있으니 없으면 추가
@@ -63,6 +72,9 @@ db.exec(`
 const bookColumns = db.prepare('PRAGMA table_info(books)').all().map(c => c.name);
 if (!bookColumns.includes('status')) {
   db.exec("ALTER TABLE books ADD COLUMN status TEXT DEFAULT 'done'");
+}
+if (!bookColumns.includes('summary')) {
+  db.exec("ALTER TABLE books ADD COLUMN summary TEXT DEFAULT ''");
 }
 
 const VALID_STATUSES = ['want', 'reading', 'done'];
@@ -134,6 +146,10 @@ function sanitizeNote(html) {
   });
 }
 
+function sanitizeSummary(s) {
+  return (s || '').toString().trim().slice(0, 200);
+}
+
 // ---------------------------------------------------------------------------
 // API: 카테고리
 // ---------------------------------------------------------------------------
@@ -159,7 +175,7 @@ app.delete('/api/categories/:id', requireAdmin, (req, res) => {
 // ---------------------------------------------------------------------------
 // API: 책 기록
 // ---------------------------------------------------------------------------
-function rowToBook(r) {
+function rowToBook(r, readDates) {
   return {
     id: r.id,
     title: r.title,
@@ -168,15 +184,36 @@ function rowToBook(r) {
     rating: r.rating,
     date: r.date,
     note: r.note,
+    summary: r.summary || '',
     coverUrl: r.cover_url,
     status: r.status || 'done',
+    readDates: readDates || [],
     createdAt: r.created_at,
   };
 }
 
+const getReadDatesStmt = db.prepare('SELECT id, date, pages FROM reading_dates WHERE book_id = ? ORDER BY date ASC');
+
+function replaceReadDates(bookId, readDates) {
+  const list = Array.isArray(readDates) ? readDates : [];
+  const tx = db.transaction(() => {
+    db.prepare('DELETE FROM reading_dates WHERE book_id = ?').run(bookId);
+    const insert = db.prepare('INSERT INTO reading_dates (id, book_id, date, pages, created_at) VALUES (?, ?, ?, ?, ?)');
+    const seenDates = new Set();
+    for (const entry of list) {
+      const date = (entry && entry.date || '').trim();
+      if (!date || seenDates.has(date)) continue; // 날짜별 하나만 (중복 방지)
+      seenDates.add(date);
+      const pages = Number.isFinite(Number(entry.pages)) ? Math.max(0, Math.floor(Number(entry.pages))) : 0;
+      insert.run(crypto.randomUUID(), bookId, date, pages, Date.now());
+    }
+  });
+  tx();
+}
+
 app.get('/api/books', (req, res) => {
   const rows = db.prepare('SELECT * FROM books ORDER BY date DESC, created_at DESC').all();
-  res.json(rows.map(rowToBook));
+  res.json(rows.map(r => rowToBook(r, getReadDatesStmt.all(r.id))));
 });
 
 app.post('/api/books', requireAdmin, (req, res) => {
@@ -194,16 +231,19 @@ app.post('/api/books', requireAdmin, (req, res) => {
     rating: Number(b.rating) || 0,
     date: b.date || new Date().toISOString().slice(0, 10),
     note: sanitizeNote(b.note),
+    summary: sanitizeSummary(b.summary),
     cover_url: b.coverUrl || '',
     status: normalizeStatus(b.status),
     created_at: createdAt,
   };
   db.prepare(`
-    INSERT INTO books (id, title, author, category, rating, date, note, cover_url, status, created_at)
-    VALUES (@id, @title, @author, @category, @rating, @date, @note, @cover_url, @status, @created_at)
+    INSERT INTO books (id, title, author, category, rating, date, note, summary, cover_url, status, created_at)
+    VALUES (@id, @title, @author, @category, @rating, @date, @note, @summary, @cover_url, @status, @created_at)
   `).run(row);
 
-  res.json(rowToBook(row));
+  replaceReadDates(id, b.readDates);
+
+  res.json(rowToBook(row, getReadDatesStmt.all(id)));
 });
 
 app.put('/api/books/:id', requireAdmin, (req, res) => {
@@ -222,20 +262,24 @@ app.put('/api/books/:id', requireAdmin, (req, res) => {
     rating: Number(b.rating) || 0,
     date: b.date || existing.date,
     note: sanitizeNote(b.note),
+    summary: b.summary !== undefined ? sanitizeSummary(b.summary) : (existing.summary || ''),
     cover_url: b.coverUrl !== undefined ? b.coverUrl : existing.cover_url,
     status: b.status !== undefined ? normalizeStatus(b.status) : (existing.status || 'done'),
   };
   db.prepare(`
     UPDATE books SET title=@title, author=@author, category=@category, rating=@rating,
-      date=@date, note=@note, cover_url=@cover_url, status=@status WHERE id=@id
+      date=@date, note=@note, summary=@summary, cover_url=@cover_url, status=@status WHERE id=@id
   `).run(updated);
 
+  if (b.readDates !== undefined) replaceReadDates(req.params.id, b.readDates);
+
   const row = db.prepare('SELECT * FROM books WHERE id = ?').get(req.params.id);
-  res.json(rowToBook(row));
+  res.json(rowToBook(row, getReadDatesStmt.all(req.params.id)));
 });
 
 app.delete('/api/books/:id', requireAdmin, (req, res) => {
   db.prepare('DELETE FROM books WHERE id = ?').run(req.params.id);
+  db.prepare('DELETE FROM reading_dates WHERE book_id = ?').run(req.params.id);
   res.json({ ok: true });
 });
 
