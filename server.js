@@ -77,6 +77,21 @@ if (!bookColumns.includes('summary')) {
   db.exec("ALTER TABLE books ADD COLUMN summary TEXT DEFAULT ''");
 }
 
+// 마이그레이션: 카테고리를 폴더처럼 중첩할 수 있도록 parent_id 추가
+const categoryColumns = db.prepare('PRAGMA table_info(categories)').all().map(c => c.name);
+if (!categoryColumns.includes('parent_id')) {
+  db.exec('ALTER TABLE categories ADD COLUMN parent_id TEXT DEFAULT NULL');
+}
+
+// 마이그레이션: 책/영화/드라마를 한 목록에서 다루기 위한 콘텐츠 유형
+if (!bookColumns.includes('type')) {
+  db.exec("ALTER TABLE books ADD COLUMN type TEXT DEFAULT 'book'");
+}
+const VALID_TYPES = ['book', 'movie', 'drama'];
+function normalizeType(t) {
+  return VALID_TYPES.includes(t) ? t : 'book';
+}
+
 const VALID_STATUSES = ['want', 'reading', 'done'];
 function normalizeStatus(s) {
   return VALID_STATUSES.includes(s) ? s : 'done';
@@ -155,21 +170,38 @@ function sanitizeSummary(s) {
 // ---------------------------------------------------------------------------
 app.get('/api/categories', (req, res) => {
   const rows = db.prepare('SELECT * FROM categories ORDER BY created_at ASC').all();
-  res.json(rows.map(r => ({ id: r.id, name: r.name, createdAt: r.created_at })));
+  res.json(rows.map(r => ({ id: r.id, name: r.name, createdAt: r.created_at, parentId: r.parent_id || null })));
 });
 
 app.post('/api/categories', requireAdmin, (req, res) => {
   const name = (req.body.name || '').trim();
   if (!name) return res.status(400).json({ error: '카테고리 이름이 필요해요.' });
+  const parentId = req.body.parentId || null;
+  if (parentId) {
+    const parent = db.prepare('SELECT id FROM categories WHERE id = ?').get(parentId);
+    if (!parent) return res.status(400).json({ error: '상위 카테고리를 찾을 수 없어요.' });
+  }
   const id = crypto.randomUUID();
   const createdAt = Date.now();
-  db.prepare('INSERT INTO categories (id, name, created_at) VALUES (?, ?, ?)').run(id, name, createdAt);
-  res.json({ id, name, createdAt });
+  db.prepare('INSERT INTO categories (id, name, created_at, parent_id) VALUES (?, ?, ?, ?)').run(id, name, createdAt, parentId);
+  res.json({ id, name, createdAt, parentId });
 });
 
 app.delete('/api/categories/:id', requireAdmin, (req, res) => {
-  db.prepare('DELETE FROM categories WHERE id = ?').run(req.params.id);
-  res.json({ ok: true });
+  // 폴더(하위 카테고리)를 지우면 그 밑에 있는 하위 카테고리들도 같이 삭제
+  const descendants = db.prepare(`
+    WITH RECURSIVE descendants(id) AS (
+      SELECT id FROM categories WHERE id = ?
+      UNION ALL
+      SELECT c.id FROM categories c JOIN descendants d ON c.parent_id = d.id
+    )
+    SELECT id FROM descendants
+  `).all(req.params.id).map(r => r.id);
+
+  const del = db.prepare('DELETE FROM categories WHERE id = ?');
+  const tx = db.transaction((ids) => { ids.forEach(id => del.run(id)); });
+  tx(descendants);
+  res.json({ ok: true, deletedIds: descendants });
 });
 
 // ---------------------------------------------------------------------------
@@ -187,6 +219,7 @@ function rowToBook(r, readDates) {
     summary: r.summary || '',
     coverUrl: r.cover_url,
     status: r.status || 'done',
+    type: r.type || 'book',
     readDates: readDates || [],
     createdAt: r.created_at,
   };
@@ -234,11 +267,12 @@ app.post('/api/books', requireAdmin, (req, res) => {
     summary: sanitizeSummary(b.summary),
     cover_url: b.coverUrl || '',
     status: normalizeStatus(b.status),
+    type: normalizeType(b.type),
     created_at: createdAt,
   };
   db.prepare(`
-    INSERT INTO books (id, title, author, category, rating, date, note, summary, cover_url, status, created_at)
-    VALUES (@id, @title, @author, @category, @rating, @date, @note, @summary, @cover_url, @status, @created_at)
+    INSERT INTO books (id, title, author, category, rating, date, note, summary, cover_url, status, type, created_at)
+    VALUES (@id, @title, @author, @category, @rating, @date, @note, @summary, @cover_url, @status, @type, @created_at)
   `).run(row);
 
   replaceReadDates(id, b.readDates);
@@ -265,10 +299,11 @@ app.put('/api/books/:id', requireAdmin, (req, res) => {
     summary: b.summary !== undefined ? sanitizeSummary(b.summary) : (existing.summary || ''),
     cover_url: b.coverUrl !== undefined ? b.coverUrl : existing.cover_url,
     status: b.status !== undefined ? normalizeStatus(b.status) : (existing.status || 'done'),
+    type: b.type !== undefined ? normalizeType(b.type) : (existing.type || 'book'),
   };
   db.prepare(`
     UPDATE books SET title=@title, author=@author, category=@category, rating=@rating,
-      date=@date, note=@note, summary=@summary, cover_url=@cover_url, status=@status WHERE id=@id
+      date=@date, note=@note, summary=@summary, cover_url=@cover_url, status=@status, type=@type WHERE id=@id
   `).run(updated);
 
   if (b.readDates !== undefined) replaceReadDates(req.params.id, b.readDates);
@@ -287,14 +322,24 @@ app.delete('/api/books/:id', requireAdmin, (req, res) => {
 // API: 통계 (누적 권수 + 연도별 그래프) — 누구나 조회 가능
 // ---------------------------------------------------------------------------
 app.get('/api/stats', (req, res) => {
-  const totalBooks = db.prepare("SELECT COUNT(*) AS c FROM books WHERE status = 'done'").get().c;
-  const byYear = db.prepare(`
-    SELECT substr(date, 1, 4) AS year, COUNT(*) AS count
-    FROM books
-    WHERE status = 'done' AND date IS NOT NULL AND date != ''
-    GROUP BY year
-    ORDER BY year ASC
-  `).all().filter(r => /^\d{4}$/.test(r.year));
+  const type = VALID_TYPES.includes(req.query.type) ? req.query.type : null;
+  const totalBooks = type
+    ? db.prepare("SELECT COUNT(*) AS c FROM books WHERE status = 'done' AND type = ?").get(type).c
+    : db.prepare("SELECT COUNT(*) AS c FROM books WHERE status = 'done'").get().c;
+  const byYear = (type
+    ? db.prepare(`
+        SELECT substr(date, 1, 4) AS year, COUNT(*) AS count
+        FROM books
+        WHERE status = 'done' AND type = ? AND date IS NOT NULL AND date != ''
+        GROUP BY year ORDER BY year ASC
+      `).all(type)
+    : db.prepare(`
+        SELECT substr(date, 1, 4) AS year, COUNT(*) AS count
+        FROM books
+        WHERE status = 'done' AND date IS NOT NULL AND date != ''
+        GROUP BY year ORDER BY year ASC
+      `).all()
+  ).filter(r => /^\d{4}$/.test(r.year));
   res.json({ totalBooks, byYear });
 });
 
