@@ -49,6 +49,13 @@ db.exec(`
     cover_url TEXT DEFAULT '',
     created_at INTEGER NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS daily_logs (
+    date TEXT PRIMARY KEY,
+    read INTEGER DEFAULT 0,
+    pages INTEGER DEFAULT 0,
+    updated_at INTEGER NOT NULL
+  );
 `);
 
 // ---------------------------------------------------------------------------
@@ -215,6 +222,44 @@ app.put('/api/books/:id', requireAdmin, (req, res) => {
 app.delete('/api/books/:id', requireAdmin, (req, res) => {
   db.prepare('DELETE FROM books WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// API: 통계 (누적 권수 + 연도별 그래프) — 누구나 조회 가능
+// ---------------------------------------------------------------------------
+app.get('/api/stats', (req, res) => {
+  const totalBooks = db.prepare('SELECT COUNT(*) AS c FROM books').get().c;
+  const byYear = db.prepare(`
+    SELECT substr(date, 1, 4) AS year, COUNT(*) AS count
+    FROM books
+    WHERE date IS NOT NULL AND date != ''
+    GROUP BY year
+    ORDER BY year ASC
+  `).all().filter(r => /^\d{4}$/.test(r.year));
+  res.json({ totalBooks, byYear });
+});
+
+// ---------------------------------------------------------------------------
+// API: 오늘의 기록 (읽음 여부 + 쪽수) — 조회는 누구나, 수정은 관리자만
+// ---------------------------------------------------------------------------
+app.get('/api/daily-logs/:date', (req, res) => {
+  const row = db.prepare('SELECT * FROM daily_logs WHERE date = ?').get(req.params.date);
+  res.json(row
+    ? { date: row.date, read: !!row.read, pages: row.pages }
+    : { date: req.params.date, read: false, pages: 0 });
+});
+
+app.put('/api/daily-logs/:date', requireAdmin, (req, res) => {
+  const { date } = req.params;
+  const b = req.body || {};
+  const read = b.read ? 1 : 0;
+  const pages = Number.isFinite(Number(b.pages)) ? Math.max(0, Math.floor(Number(b.pages))) : 0;
+  const updatedAt = Date.now();
+  db.prepare(`
+    INSERT INTO daily_logs (date, read, pages, updated_at) VALUES (@date, @read, @pages, @updatedAt)
+    ON CONFLICT(date) DO UPDATE SET read=@read, pages=@pages, updated_at=@updatedAt
+  `).run({ date, read, pages, updatedAt });
+  res.json({ date, read: !!read, pages });
 });
 
 // ---------------------------------------------------------------------------
