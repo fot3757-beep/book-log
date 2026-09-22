@@ -45,6 +45,7 @@
   const authorFieldLabel = $('#authorFieldLabel');
   const readDatesFieldLabel = $('#readDatesFieldLabel');
   const readDatesHint = $('#readDatesHint');
+  const statusFieldLabel = $('#statusFieldLabel');
   const statsTypeTabs = $('#statsTypeTabs');
   const statsTotalLabel = $('#statsTotalLabel');
   let currentStatsType = 'all';
@@ -203,6 +204,7 @@
       icon: 'book', label: '책',
       titleLabel: '책 제목', authorLabel: '저자 (선택)',
       titlePlaceholder: '예: 불편한 편의점', authorPlaceholder: '예: 김호연',
+      statusFieldLabel: '읽기 상태',
       statusLabels: { want: '읽고 싶어요', reading: '읽는 중', done: '다 읽었어요' },
       dateLabels: { want: '추가한 날짜', reading: '읽기 시작한 날짜', done: '다 읽은 날짜' },
       readDatesLabel: '읽은 날짜 (하루에 다 못 읽었다면 여러 날짜를 나눠서 추가하세요)',
@@ -214,6 +216,7 @@
       icon: 'film', label: '영화',
       titleLabel: '영화 제목', authorLabel: '감독/출연 (선택)',
       titlePlaceholder: '예: 인터스텔라', authorPlaceholder: '예: 크리스토퍼 놀란',
+      statusFieldLabel: '관람 상태',
       statusLabels: { want: '보고 싶어요', reading: '보는 중', done: '다 봤어요' },
       dateLabels: { want: '추가한 날짜', reading: '보기 시작한 날짜', done: '다 본 날짜' },
       readDatesLabel: '본 날짜 (나눠서 봤다면 여러 날짜를 추가하세요)',
@@ -225,6 +228,7 @@
       icon: 'tv', label: '드라마',
       titleLabel: '드라마 제목', authorLabel: '감독/출연 (선택)',
       titlePlaceholder: '예: 미스터 션샤인', authorPlaceholder: '예: 이응복',
+      statusFieldLabel: '시청 상태',
       statusLabels: { want: '보고 싶어요', reading: '보는 중', done: '다 봤어요' },
       dateLabels: { want: '추가한 날짜', reading: '보기 시작한 날짜', done: '다 본 날짜' },
       readDatesLabel: '본 날짜 (하루에 몰아보지 않았다면 회차별로 날짜를 추가하세요)',
@@ -244,6 +248,7 @@
     inTitle.placeholder = meta.titlePlaceholder;
     authorFieldLabel.textContent = meta.authorLabel;
     inAuthor.placeholder = meta.authorPlaceholder;
+    statusFieldLabel.textContent = meta.statusFieldLabel;
     readDatesFieldLabel.textContent = meta.readDatesLabel;
     readDatesHint.textContent = meta.readDatesHint;
     inReadPagesNew.placeholder = meta.pagesPlaceholder;
