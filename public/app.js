@@ -704,7 +704,7 @@
             <div class="book-meta">
               <div class="rating">${starsInlineHtml(b.rating)}</div>
               <div class="card-bottom-row">
-                ${b.type && b.type !== 'book' ? `<span class="type-badge"><i data-lucide="${TYPE_META[b.type].icon}"></i>${escapeHtml(TYPE_META[b.type].label)}</span>` : ''}
+                <span class="type-badge"><i data-lucide="${(TYPE_META[b.type] || TYPE_META.book).icon}"></i>${escapeHtml((TYPE_META[b.type] || TYPE_META.book).label)}</span>
                 ${b.status && b.status !== 'done' ? `<span class="status-badge ${b.status}">${escapeHtml((TYPE_META[b.type] || TYPE_META.book).statusLabels[b.status] || '')}</span>` : ''}
                 ${b.category ? `<span class="cat-tag">${escapeHtml(b.category)}</span>` : ''}
                 ${b.date ? `<span class="date-badge"><i data-lucide="calendar"></i><span>${fmtDate(b.date)}</span></span>` : ''}
@@ -757,7 +757,7 @@
       ${b.summary ? `<p class="detail-summary">${escapeHtml(b.summary)}</p>` : ''}
       <div class="detail-meta-row">
         <div class="detail-stars">${starsHtml}</div>
-        ${b.type && b.type !== 'book' ? `<span class="type-badge"><i data-lucide="${TYPE_META[b.type].icon}"></i>${escapeHtml(TYPE_META[b.type].label)}</span>` : ''}
+        <span class="type-badge"><i data-lucide="${(TYPE_META[b.type] || TYPE_META.book).icon}"></i>${escapeHtml((TYPE_META[b.type] || TYPE_META.book).label)}</span>
         ${b.status && b.status !== 'done' ? `<span class="status-badge ${b.status}">${escapeHtml((TYPE_META[b.type] || TYPE_META.book).statusLabels[b.status] || '')}</span>` : ''}
         ${b.category ? `<span class="cat-tag">${escapeHtml(b.category)}</span>` : ''}
         ${b.date ? `<span class="date-badge"><i data-lucide="calendar"></i><span>${fmtDate(b.date)}</span></span>` : ''}
@@ -1247,7 +1247,7 @@
         <div class="day-picker-info">
           <div class="day-picker-title">${escapeHtml(b.title)}</div>
           <div class="day-picker-meta">
-            ${b.type && b.type !== 'book' ? `<span class="type-badge"><i data-lucide="${TYPE_META[b.type].icon}"></i>${escapeHtml(TYPE_META[b.type].label)}</span>` : ''}
+            <span class="type-badge"><i data-lucide="${(TYPE_META[b.type] || TYPE_META.book).icon}"></i>${escapeHtml((TYPE_META[b.type] || TYPE_META.book).label)}</span>
             ${b.author ? `<span>${escapeHtml(b.author)}</span>` : ''}
           </div>
         </div>
