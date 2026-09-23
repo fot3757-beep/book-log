@@ -87,6 +87,9 @@ if (!categoryColumns.includes('parent_id')) {
 if (!bookColumns.includes('type')) {
   db.exec("ALTER TABLE books ADD COLUMN type TEXT DEFAULT 'book'");
 }
+if (!bookColumns.includes('pages')) {
+  db.exec('ALTER TABLE books ADD COLUMN pages INTEGER DEFAULT 0');
+}
 const VALID_TYPES = ['book', 'movie', 'drama'];
 function normalizeType(t) {
   return VALID_TYPES.includes(t) ? t : 'book';
@@ -220,6 +223,7 @@ function rowToBook(r, readDates) {
     coverUrl: r.cover_url,
     status: r.status || 'done',
     type: r.type || 'book',
+    pages: r.pages || 0,
     readDates: readDates || [],
     createdAt: r.created_at,
   };
@@ -268,11 +272,12 @@ app.post('/api/books', requireAdmin, (req, res) => {
     cover_url: b.coverUrl || '',
     status: normalizeStatus(b.status),
     type: normalizeType(b.type),
+    pages: Number.isFinite(Number(b.pages)) ? Math.max(0, Math.floor(Number(b.pages))) : 0,
     created_at: createdAt,
   };
   db.prepare(`
-    INSERT INTO books (id, title, author, category, rating, date, note, summary, cover_url, status, type, created_at)
-    VALUES (@id, @title, @author, @category, @rating, @date, @note, @summary, @cover_url, @status, @type, @created_at)
+    INSERT INTO books (id, title, author, category, rating, date, note, summary, cover_url, status, type, pages, created_at)
+    VALUES (@id, @title, @author, @category, @rating, @date, @note, @summary, @cover_url, @status, @type, @pages, @created_at)
   `).run(row);
 
   replaceReadDates(id, b.readDates);
@@ -300,10 +305,13 @@ app.put('/api/books/:id', requireAdmin, (req, res) => {
     cover_url: b.coverUrl !== undefined ? b.coverUrl : existing.cover_url,
     status: b.status !== undefined ? normalizeStatus(b.status) : (existing.status || 'done'),
     type: b.type !== undefined ? normalizeType(b.type) : (existing.type || 'book'),
+    pages: b.pages !== undefined
+      ? (Number.isFinite(Number(b.pages)) ? Math.max(0, Math.floor(Number(b.pages))) : 0)
+      : (existing.pages || 0),
   };
   db.prepare(`
     UPDATE books SET title=@title, author=@author, category=@category, rating=@rating,
-      date=@date, note=@note, summary=@summary, cover_url=@cover_url, status=@status, type=@type WHERE id=@id
+      date=@date, note=@note, summary=@summary, cover_url=@cover_url, status=@status, type=@type, pages=@pages WHERE id=@id
   `).run(updated);
 
   if (b.readDates !== undefined) replaceReadDates(req.params.id, b.readDates);
