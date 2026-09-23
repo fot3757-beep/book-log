@@ -1,6 +1,8 @@
 (function () {
   let categories = [];
   let books = [];
+  let dailyLogs = [];
+  let dailyLogsMap = {};
   let currentFilter = 'all';
   let searchQuery = '';
   let editingId = null;
@@ -100,6 +102,9 @@
   const todayReadCheck = $('#todayReadCheck');
   const todayPages = $('#todayPages');
   const todaySaveConfirm = $('#todaySaveConfirm');
+  const todayStreakLine = $('#todayStreakLine');
+  const streakBadge = $('#streakBadge');
+  const streakBadgeText = $('#streakBadgeText');
   let statsChart = null;
 
   const calendarOverlay = $('#calendarOverlay');
@@ -108,6 +113,9 @@
   const calendarGrid = $('#calendarGrid');
   const calPrevBtn = $('#calPrevBtn');
   const calNextBtn = $('#calNextBtn');
+  const dayPickerOverlay = $('#dayPickerOverlay');
+  const dayPickerTitle = $('#dayPickerTitle');
+  const dayPickerList = $('#dayPickerList');
   let calendarMonth = new Date(); // 현재 보고 있는 달 (1일 기준)
   calendarMonth.setDate(1);
 
@@ -376,6 +384,42 @@
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
+  function isoDate(d) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  // ---------- 연속 기록(스트릭) ----------
+  function computeStreak() {
+    let streak = 0;
+    const cursor = new Date();
+    const todayLog = dailyLogsMap[todayStr()];
+    if (!todayLog || !todayLog.read) {
+      cursor.setDate(cursor.getDate() - 1); // 오늘 아직 체크 안 했으면 어제부터 거슬러 확인
+    }
+    while (true) {
+      const log = dailyLogsMap[isoDate(cursor)];
+      if (log && log.read) {
+        streak++;
+        cursor.setDate(cursor.getDate() - 1);
+      } else {
+        break;
+      }
+    }
+    return streak;
+  }
+
+  function renderStreakBadge() {
+    const streak = computeStreak();
+    if (streak <= 0) {
+      streakBadge.style.display = 'none';
+      if (todayStreakLine) todayStreakLine.textContent = '';
+      return;
+    }
+    streakBadge.style.display = 'flex';
+    streakBadgeText.textContent = `${streak}일째 연속으로 읽는 중`;
+    if (todayStreakLine) todayStreakLine.textContent = `🔥 ${streak}일째 연속 기록 중이에요`;
+  }
+
   // ---------- API ----------
   async function api(path, options) {
     const opts = options || {};
@@ -451,16 +495,20 @@
 
   async function loadAll() {
     try {
-      [categories, books] = await Promise.all([
+      [categories, books, dailyLogs] = await Promise.all([
         api('/api/categories'),
         api('/api/books'),
+        api('/api/daily-logs'),
       ]);
+      dailyLogsMap = {};
+      dailyLogs.forEach(l => { dailyLogsMap[l.date] = l; });
       statusNote.textContent = '';
     } catch (err) {
       console.error(err);
       statusNote.textContent = '서버에 연결할 수 없어요. 잠시 후 새로고침해주세요.';
     }
     renderAll();
+    renderStreakBadge();
   }
 
   // ---------- Rendering ----------
@@ -984,6 +1032,8 @@
       todayViewStatus.textContent = log.read
         ? `오늘 읽었어요${log.pages ? ` · ${log.pages}쪽` : ''}`
         : '오늘은 아직 안 읽었어요';
+      dailyLogsMap[today] = log;
+      renderStreakBadge();
     } catch (err) {
       console.error(err);
     }
@@ -1028,7 +1078,7 @@
     const FALLBACK_PAGES = 200; // 쪽수를 안 넣은 기록은 이 값으로 대체해서 블록이 보이게 함
     const pagesOf = (b) => (b.pages && b.pages > 0 ? b.pages : FALLBACK_PAGES);
     const maxPages = Math.max(...list.map(pagesOf));
-    const MIN_H = 42, MAX_H = 130;
+    const MIN_H = 40, MAX_H = 100;
 
     stackTower.innerHTML = list.map((b, i) => {
       const p = pagesOf(b);
@@ -1087,6 +1137,11 @@
       todayViewStatus.textContent = saved.read
         ? `오늘 읽었어요${saved.pages ? ` · ${saved.pages}쪽` : ''}`
         : '오늘은 아직 안 읽었어요';
+      dailyLogsMap[today] = saved;
+      const idx = dailyLogs.findIndex(l => l.date === today);
+      if (idx > -1) dailyLogs[idx] = saved; else dailyLogs.push(saved);
+      renderStreakBadge();
+      if (calendarOverlay.classList.contains('show')) renderCalendar();
       todaySaveConfirm.classList.add('show');
       clearTimeout(todaySaveConfirm._timer);
       todaySaveConfirm._timer = setTimeout(() => todaySaveConfirm.classList.remove('show'), 2200);
@@ -1136,20 +1191,25 @@
       const dayBooks = map[dateStr] || [];
       const isToday = dateStr === today;
       const hasBook = dayBooks.length > 0;
-      const first = dayBooks[0];
 
       let coverHtml = '';
       if (hasBook) {
-        coverHtml = first.coverUrl
-          ? `<img class="cal-cover-img" src="${first.coverUrl}" alt="">`
-          : `<div class="cal-cover-fallback"><i data-lucide="book"></i></div>`;
+        const layers = dayBooks.slice(0, 3); // 최대 3장까지 겹쳐서 보여줌
+        coverHtml = `<div class="cal-cover-stack">` + layers.map(b =>
+          b.coverUrl
+            ? `<img class="cal-cover-img" src="${b.coverUrl}" alt="">`
+            : `<div class="cal-cover-fallback"><i data-lucide="${(TYPE_META[b.type] || TYPE_META.book).icon}"></i></div>`
+        ).reverse().join('') + `</div>`; // reverse: 첫 번째 책이 맨 위(z-index 제일 높게) 오도록
       }
-      const badge = dayBooks.length > 1 ? `<span class="cal-badge">+${dayBooks.length - 1}</span>` : '';
+      const badge = dayBooks.length > 3 ? `<span class="cal-badge">+${dayBooks.length - 3}</span>` : '';
+      const readDot = (dailyLogsMap[dateStr] && dailyLogsMap[dateStr].read) ? '<span class="cal-read-dot" title="이 날 읽었어요"></span>' : '';
+      const ids = dayBooks.map(b => b.id).join(',');
 
       html += `
-        <div class="cal-cell ${hasBook ? 'has-book' : ''} ${isToday ? 'is-today' : ''}" data-date="${dateStr}" data-first-id="${hasBook ? first.id : ''}">
+        <div class="cal-cell ${hasBook ? 'has-book' : ''} ${isToday ? 'is-today' : ''}" data-date="${dateStr}" data-ids="${ids}">
           <span class="cal-day-num">${day}</span>
           ${coverHtml}
+          ${readDot}
           ${badge}
         </div>`;
     }
@@ -1157,9 +1217,13 @@
 
     calendarGrid.querySelectorAll('.cal-cell.has-book').forEach(cell => {
       cell.addEventListener('click', () => {
-        const id = cell.dataset.firstId;
-        calendarOverlay.classList.remove('show');
-        openDetail(id);
+        const ids = cell.dataset.ids.split(',').filter(Boolean);
+        if (ids.length === 1) {
+          calendarOverlay.classList.remove('show');
+          openDetail(ids[0]);
+        } else {
+          openDayPicker(cell.dataset.date, ids);
+        }
       });
     });
     calendarGrid.querySelectorAll('.cal-cell:not(.has-book):not(.empty)').forEach(cell => {
@@ -1172,6 +1236,35 @@
     });
     refreshIcons();
   }
+
+  // ---------- 하루에 여러 개 있을 때 고르는 팝업 ----------
+  function openDayPicker(dateStr, ids) {
+    const items = ids.map(id => books.find(b => b.id === id)).filter(Boolean);
+    dayPickerTitle.textContent = fmtDate(dateStr);
+    dayPickerList.innerHTML = items.map(b => `
+      <div class="day-picker-item" data-id="${b.id}">
+        <div class="day-picker-thumb">${b.coverUrl ? `<img src="${b.coverUrl}" alt="">` : `<i data-lucide="${(TYPE_META[b.type] || TYPE_META.book).icon}"></i>`}</div>
+        <div class="day-picker-info">
+          <div class="day-picker-title">${escapeHtml(b.title)}</div>
+          <div class="day-picker-meta">
+            ${b.type && b.type !== 'book' ? `<span class="type-badge"><i data-lucide="${TYPE_META[b.type].icon}"></i>${escapeHtml(TYPE_META[b.type].label)}</span>` : ''}
+            ${b.author ? `<span>${escapeHtml(b.author)}</span>` : ''}
+          </div>
+        </div>
+      </div>
+    `).join('');
+    dayPickerList.querySelectorAll('.day-picker-item').forEach(el => {
+      el.addEventListener('click', () => {
+        dayPickerOverlay.classList.remove('show');
+        calendarOverlay.classList.remove('show');
+        openDetail(el.dataset.id);
+      });
+    });
+    refreshIcons();
+    dayPickerOverlay.classList.add('show');
+  }
+  $('#btnDayPickerClose').addEventListener('click', () => dayPickerOverlay.classList.remove('show'));
+  dayPickerOverlay.addEventListener('click', (e) => { if (e.target === dayPickerOverlay) dayPickerOverlay.classList.remove('show'); });
 
   calendarNavBtn.addEventListener('click', () => {
     calendarMonth = new Date();

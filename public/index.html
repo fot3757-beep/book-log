@@ -26,6 +26,11 @@
       <span>캘린더</span>
     </button>
 
+    <div class="streak-badge" id="streakBadge" style="display:none;">
+      <i data-lucide="flame"></i>
+      <span id="streakBadgeText">0일째 연속으로 읽는 중</span>
+    </div>
+
     <div class="category-section">
       <h3>Categories</h3>
       <ul class="category-list" id="categoryList"></ul>
@@ -233,9 +238,20 @@
       <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
     </div>
     <div class="calendar-grid" id="calendarGrid"></div>
-    <p class="calendar-hint">표지가 있는 날짜를 누르면 그날 기록으로 이동해요.</p>
+    <p class="calendar-hint">표지가 있는 날짜를 누르면 그날 기록으로 이동해요. 여러 개면 고를 수 있어요.</p>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="btnCalendarClose">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 하루에 여러 기록이 있을 때 고르는 팝업 -->
+<div class="overlay" id="dayPickerOverlay">
+  <div class="modal cat-modal">
+    <h2 id="dayPickerTitle">2026.09.22</h2>
+    <div class="day-picker-list" id="dayPickerList"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="btnDayPickerClose">닫기</button>
     </div>
   </div>
 </div>
@@ -288,6 +304,7 @@
 
       <div class="today-view" id="todayView">
         <span class="today-view-status" id="todayViewStatus">—</span>
+        <span class="today-streak-line" id="todayStreakLine"></span>
       </div>
 
       <div class="today-edit admin-only" id="todayEdit">
