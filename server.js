@@ -354,6 +354,11 @@ app.get('/api/stats', (req, res) => {
 // ---------------------------------------------------------------------------
 // API: 오늘의 기록 (읽음 여부 + 쪽수) — 조회는 누구나, 수정은 관리자만
 // ---------------------------------------------------------------------------
+app.get('/api/daily-logs', (req, res) => {
+  const rows = db.prepare('SELECT * FROM daily_logs ORDER BY date ASC').all();
+  res.json(rows.map(r => ({ date: r.date, read: !!r.read, pages: r.pages })));
+});
+
 app.get('/api/daily-logs/:date', (req, res) => {
   const row = db.prepare('SELECT * FROM daily_logs WHERE date = ?').get(req.params.date);
   res.json(row
