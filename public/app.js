@@ -1291,4 +1291,11 @@
       if (!ok) { adminPassword = ''; localStorage.removeItem('bookLogAdminPassword'); }
     });
   }
+
+  // 홈 화면에 설치 가능한 앱(PWA)으로 동작하게 하는 서비스워커 등록
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    });
+  }
 })();
