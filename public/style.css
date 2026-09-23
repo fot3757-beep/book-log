@@ -350,6 +350,32 @@ header {
 .type-badge svg { width: 11px; height: 11px; }
 
 .stats-type-tabs { justify-content: center; margin-bottom: 18px; }
+.stats-mode-tabs { justify-content: center; margin-bottom: 16px; }
+
+/* ---------- Stack view (쌓아보기) ---------- */
+.stack-year-nav {
+  display: flex; align-items: center; justify-content: center; gap: 14px;
+  font-size: 0.95rem; font-weight: 700; color: var(--ink); margin-bottom: 6px;
+}
+.stack-height-line { text-align: center; font-size: 0.82rem; color: var(--ink-faint); margin-bottom: 18px; }
+.stack-height-line strong { color: var(--ink); font-weight: 700; }
+
+.stack-tower {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  max-height: 420px; overflow-y: auto; padding: 4px;
+}
+.stack-block {
+  width: 100%; max-width: 320px; border-radius: 999px; display: flex; align-items: center;
+  justify-content: center; text-align: center; padding: 6px 18px; font-size: 0.82rem;
+  font-weight: 600; overflow: hidden; cursor: pointer; flex: none;
+}
+.stack-block span {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%;
+}
+.stack-block.tone-0 { background: var(--tag-bg); color: var(--ink-soft); }
+.stack-block.tone-1 { background: var(--ink-faintest); color: var(--surface); }
+.stack-block.tone-2 { background: var(--ink-faint); color: var(--surface); }
+.stack-block.tone-3 { background: var(--ink); color: var(--accent-contrast); }
 
 .book-card {
   background-color: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);

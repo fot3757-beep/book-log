@@ -32,6 +32,8 @@
   const inTitle = $('#inTitle');
   const inAuthor = $('#inAuthor');
   const inSummary = $('#inSummary');
+  const inPages = $('#inPages');
+  const pagesFieldLabel = $('#pagesFieldLabel');
   const inCategory = $('#inCategory');
   const inDate = $('#inDate');
   const starPicker = $('#starPicker');
@@ -49,6 +51,38 @@
   const statsTypeTabs = $('#statsTypeTabs');
   const statsTotalLabel = $('#statsTotalLabel');
   let currentStatsType = 'all';
+
+  const statsModeTabs = $('#statsModeTabs');
+  const statsChartWrap = $('#statsChartWrap');
+  const stackView = $('#stackView');
+  const stackYearLabel = $('#stackYearLabel');
+  const stackPrevYear = $('#stackPrevYear');
+  const stackNextYear = $('#stackNextYear');
+  const stackHeightLine = $('#stackHeightLine');
+  const stackTower = $('#stackTower');
+  const stackEmpty = $('#stackEmpty');
+  let statsMode = 'chart';
+  let stackYear = new Date().getFullYear();
+
+  const REFERENCE_OBJECTS = [
+    { cm: 1.5, label: '스마트폰 두께' },
+    { cm: 15, label: '볼펜 길이' },
+    { cm: 24, label: 'A4 용지 길이' },
+    { cm: 33, label: '태블릿 PC' },
+    { cm: 50, label: '킥보드 손잡이 높이' },
+    { cm: 100, label: '초등학생 키' },
+    { cm: 170, label: '성인 평균 키' },
+    { cm: 300, label: '농구 골대 높이' },
+    { cm: 500, label: '기린 키' },
+    { cm: 828, label: '롯데월드타워 높이의 1/5' },
+  ];
+  function pickReference(cm) {
+    let best = REFERENCE_OBJECTS[0];
+    for (const ref of REFERENCE_OBJECTS) {
+      if (ref.cm <= cm) best = ref;
+    }
+    return best;
+  }
   const statusPicker = $('#statusPicker');
   const dateFieldLabel = $('#dateFieldLabel');
   const readDatesList = $('#readDatesList');
@@ -210,6 +244,8 @@
       readDatesLabel: '읽은 날짜 (하루에 다 못 읽었다면 여러 날짜를 나눠서 추가하세요)',
       readDatesHint: "여기에 추가한 날짜들이 캘린더에 이 책 표지로 표시돼요. 하나도 안 넣으면 위의 '날짜' 하나만 캘린더에 반영돼요.",
       pagesPlaceholder: '쪽수(선택)',
+      totalPagesFieldLabel: '전체 쪽수 (선택, 쌓아보기 통계에 쓰여요)',
+      totalPagesPlaceholder: '예: 320',
       statsLabel: '권 완독',
     },
     movie: {
@@ -222,6 +258,8 @@
       readDatesLabel: '본 날짜 (나눠서 봤다면 여러 날짜를 추가하세요)',
       readDatesHint: "여기에 추가한 날짜들이 캘린더에 이 영화 포스터로 표시돼요. 하나도 안 넣으면 위의 '날짜' 하나만 캘린더에 반영돼요.",
       pagesPlaceholder: '메모(선택)',
+      totalPagesFieldLabel: '러닝타임 분 (선택, 쌓아보기 통계에 쓰여요)',
+      totalPagesPlaceholder: '예: 169',
       statsLabel: '편 감상',
     },
     drama: {
@@ -234,6 +272,8 @@
       readDatesLabel: '본 날짜 (하루에 몰아보지 않았다면 회차별로 날짜를 추가하세요)',
       readDatesHint: "여기에 추가한 날짜들이 캘린더에 이 드라마 포스터로 표시돼요. 하나도 안 넣으면 위의 '날짜' 하나만 캘린더에 반영돼요.",
       pagesPlaceholder: '몇 회(선택)',
+      totalPagesFieldLabel: '총 러닝타임 분 (선택, 쌓아보기 통계에 쓰여요)',
+      totalPagesPlaceholder: '예: 720',
       statsLabel: '편 완주',
     },
   };
@@ -249,6 +289,8 @@
     authorFieldLabel.textContent = meta.authorLabel;
     inAuthor.placeholder = meta.authorPlaceholder;
     statusFieldLabel.textContent = meta.statusFieldLabel;
+    pagesFieldLabel.textContent = meta.totalPagesFieldLabel;
+    inPages.placeholder = meta.totalPagesPlaceholder;
     readDatesFieldLabel.textContent = meta.readDatesLabel;
     readDatesHint.textContent = meta.readDatesHint;
     inReadPagesNew.placeholder = meta.pagesPlaceholder;
@@ -709,6 +751,7 @@
     inTitle.value = '';
     inAuthor.value = '';
     inSummary.value = '';
+    inPages.value = '';
     inDate.value = todayStr();
     quill.setContents([]);
     setRating(0);
@@ -731,6 +774,7 @@
     inTitle.value = b.title || '';
     inAuthor.value = b.author || '';
     inSummary.value = b.summary || '';
+    inPages.value = b.pages || '';
     inDate.value = b.date || todayStr();
     quill.root.innerHTML = b.note || '';
     setRating(b.rating || 0);
@@ -761,6 +805,7 @@
       coverUrl: currentCoverUrl || '',
       status: currentStatus,
       type: currentType,
+      pages: Number(inPages.value) || 0,
       readDates: currentReadDates,
     };
     try {
@@ -947,6 +992,7 @@
   statsBtn.addEventListener('click', () => {
     statsOverlay.classList.add('show');
     loadStats();
+    if (statsMode === 'stack') renderStack();
   });
   statsTypeTabs.addEventListener('click', (e) => {
     const t = e.target.closest('.status-pick');
@@ -954,7 +1000,79 @@
     currentStatsType = t.dataset.type;
     statsTypeTabs.querySelectorAll('.status-pick').forEach(btn => btn.classList.toggle('active', btn === t));
     loadStats();
+    if (statsMode === 'stack') renderStack();
   });
+
+  // ---------- Stack view (쌓아보기) ----------
+  function booksForStack() {
+    return books.filter(b => {
+      if (b.status !== 'done') return false;
+      if (currentStatsType !== 'all' && (b.type || 'book') !== currentStatsType) return false;
+      if (!b.date || !b.date.startsWith(String(stackYear))) return false;
+      return true;
+    }).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  }
+
+  function renderStack() {
+    stackYearLabel.textContent = `${stackYear}년`;
+    const list = booksForStack();
+
+    if (list.length === 0) {
+      stackTower.innerHTML = '';
+      stackHeightLine.textContent = '';
+      stackEmpty.style.display = 'block';
+      return;
+    }
+    stackEmpty.style.display = 'none';
+
+    const FALLBACK_PAGES = 200; // 쪽수를 안 넣은 기록은 이 값으로 대체해서 블록이 보이게 함
+    const pagesOf = (b) => (b.pages && b.pages > 0 ? b.pages : FALLBACK_PAGES);
+    const maxPages = Math.max(...list.map(pagesOf));
+    const MIN_H = 42, MAX_H = 130;
+
+    stackTower.innerHTML = list.map((b, i) => {
+      const p = pagesOf(b);
+      const h = Math.round(MIN_H + (MAX_H - MIN_H) * (p / maxPages));
+      const tone = i % 4;
+      return `<div class="stack-block tone-${tone}" style="height:${h}px;" data-id="${b.id}" title="${escapeHtml(b.title)}${b.pages ? ` · ${b.pages}${b.type === 'book' ? '쪽' : '분'}` : ''}">
+        <span>${escapeHtml(b.title)}</span>
+      </div>`;
+    }).join('');
+
+    stackTower.querySelectorAll('.stack-block').forEach(el => {
+      el.addEventListener('click', () => {
+        statsOverlay.classList.remove('show');
+        openDetail(el.dataset.id);
+      });
+    });
+
+    const totalPagesWithValue = list.filter(b => b.pages && b.pages > 0);
+    if (totalPagesWithValue.length === 0) {
+      stackHeightLine.innerHTML = '쪽수를 입력한 기록이 없어서 실제 높이는 계산할 수 없어요 (블록은 임시 높이예요).';
+      return;
+    }
+    const totalPages = totalPagesWithValue.reduce((sum, b) => sum + b.pages, 0);
+    const heightCm = Math.round((totalPages / 100) * 10) / 10; // 대략 100쪽 ≈ 1cm
+    const ref = pickReference(heightCm);
+    stackHeightLine.innerHTML = `이 해에 쌓은 높이: 약 <strong>${heightCm}cm</strong> — ${escapeHtml(ref.label)}(${ref.cm}cm) 정도예요!`;
+  }
+
+  statsModeTabs.addEventListener('click', (e) => {
+    const t = e.target.closest('.status-pick');
+    if (!t) return;
+    statsMode = t.dataset.mode;
+    statsModeTabs.querySelectorAll('.status-pick').forEach(btn => btn.classList.toggle('active', btn === t));
+    if (statsMode === 'stack') {
+      statsChartWrap.style.display = 'none';
+      stackView.style.display = 'block';
+      renderStack();
+    } else {
+      statsChartWrap.style.display = 'block';
+      stackView.style.display = 'none';
+    }
+  });
+  stackPrevYear.addEventListener('click', () => { stackYear -= 1; renderStack(); });
+  stackNextYear.addEventListener('click', () => { stackYear += 1; renderStack(); });
   $('#btnStatsClose').addEventListener('click', () => statsOverlay.classList.remove('show'));
   statsOverlay.addEventListener('click', (e) => { if (e.target === statsOverlay) statsOverlay.classList.remove('show'); });
 
