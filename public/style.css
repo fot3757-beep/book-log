@@ -610,6 +610,9 @@ header {
 .detail-body li { margin-bottom: 0.4em; }
 .detail-body img { max-width: 100%; border-radius: var(--radius-md); margin: 1.2em 0; display: block; }
 .detail-body a { color: var(--ink); text-decoration: underline; }
+.detail-body .ql-align-center { text-align: center; }
+.detail-body .ql-align-right { text-align: right; }
+.detail-body .ql-align-justify { text-align: justify; }
 
 @media (max-width: 860px) {
   .wrapper { flex-direction: column; padding: 16px; }

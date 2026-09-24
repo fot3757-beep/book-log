@@ -148,6 +148,7 @@
             ['bold', 'italic', 'underline', 'strike'],
             ['blockquote'],
             [{ list: 'ordered' }, { list: 'bullet' }],
+            [{ align: [] }],
             ['link', 'image'],
             ['clean'],
           ],
