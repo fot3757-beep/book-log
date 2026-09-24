@@ -156,9 +156,9 @@ function sanitizeNote(html) {
       'h1', 'h2', 'h3', 'a', 'img', 'span', 'code', 'pre',
     ],
     allowedAttributes: {
+      '*': ['class'],
       a: ['href', 'target', 'rel'],
       img: ['src', 'alt'],
-      span: ['class'],
     },
     allowedSchemes: ['http', 'https', 'data'],
   });
